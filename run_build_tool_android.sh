@@ -4,4 +4,4 @@ gomobile init || go install golang.org/x/mobile/cmd/gomobile@latest
 gomobile init
 
 echo "Binding Bitbox to Android"
-gomobile bind -o $1 -target=ios .
+gomobile bind -o $1 -target=android -androidapi 24 .

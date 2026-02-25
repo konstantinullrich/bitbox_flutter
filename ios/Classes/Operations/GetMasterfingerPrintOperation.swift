@@ -5,7 +5,7 @@
 import Api
 import Flutter
 
-class InitBitBoxOperation: MethodCallOperation {
+class GetMasterfingerPrintOperation: MethodCallOperation {
     private var manager: BluetoothManager
 
     init(manager: BluetoothManager) {
@@ -16,6 +16,7 @@ class InitBitBoxOperation: MethodCallOperation {
         methodCall: FlutterMethodCall,
         result: FlutterResult
     ) {
-        result(Api.ApiInitDevice())
+        let fingerprint = Api.ApiGetMasterFingerprint()
+        result(fingerprint)
     }
 }

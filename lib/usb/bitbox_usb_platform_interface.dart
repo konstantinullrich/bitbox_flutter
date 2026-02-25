@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:bitbox_flutter/ios/bitbox_ios_plattform_interface.dart';
 import 'package:bitbox_flutter/usb/bitbox_device.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -12,7 +15,8 @@ abstract class BitboxUsbPlatform extends PlatformInterface {
 
   static final Object _token = Object();
 
-  static BitboxUsbPlatform _instance = createPlatformInstance();
+  static BitboxUsbPlatform _instance =
+      Platform.isIOS ? createIosPlatformInstance() : createPlatformInstance();
 
   /// The default instance of [BitboxUsbPlatform] to use.
   ///
@@ -26,6 +30,10 @@ abstract class BitboxUsbPlatform extends PlatformInterface {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }
+
+  Future<bool> startScan() => throw UnimplementedError();
+  Future<bool> isBluetoothConnected() => throw UnimplementedError();
+  Future<bool> completeConnect() async => true;
 
   Future<List<BitboxDevice>> getDevices();
 
@@ -55,11 +63,23 @@ abstract class BitboxUsbPlatform extends PlatformInterface {
 
   Future<String> getETHAddress(int chainId, Uint8List keypath, int outputType, bool display);
 
-  Future<Uint8List> signETHRPLTransaction(int chainId, Uint8List keypath, String transactionData, bool isEIP1559);
+  Future<Uint8List> signETHRPLTransaction(
+      int chainId, Uint8List keypath, String transactionData, bool isEIP1559);
 
-  Future<Uint8List> signETHTransaction(int chainId, Uint8List keypath, int nonce, String gasPrice, int gasLimit, Uint8List recipient, String value, Uint8List data, int recipientAddressCase);
+  Future<Uint8List> signETHTransaction(int chainId, Uint8List keypath, int nonce, String gasPrice,
+      int gasLimit, Uint8List recipient, String value, Uint8List data, int recipientAddressCase);
 
-  Future<Uint8List> signETHTransactionEIP1559(int chainId, Uint8List keypath, int nonce, String maxPriorityFeePerGas, String maxFeePerGas, int gasLimit, Uint8List recipient, String value, Uint8List data, int recipientAddressCase);
+  Future<Uint8List> signETHTransactionEIP1559(
+      int chainId,
+      Uint8List keypath,
+      int nonce,
+      String maxPriorityFeePerGas,
+      String maxFeePerGas,
+      int gasLimit,
+      Uint8List recipient,
+      String value,
+      Uint8List data,
+      int recipientAddressCase);
 
   Future<Uint8List> signETHMessage(int chainId, Uint8List keypath, Uint8List message);
 

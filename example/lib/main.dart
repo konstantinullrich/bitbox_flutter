@@ -31,10 +31,16 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    // initPlatformState();
   }
 
+  bool uninit = true;
   Future<void> initPlatformState() async {
+    if (uninit) {
+      await BitboxUsbPlatform.instance.requestPermission(BitboxDevice.fromIdentifier(""));
+      uninit = false;
+    }
+
     List<BitboxDevice> device;
     device = await _bitboxFlutterPlugin.devices;
     if (!mounted) return;
@@ -47,6 +53,16 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> onPressDevice(BitboxDevice usbDevice) async {
     await _bitboxFlutterPlugin.connect(usbDevice);
+
+    bool isConnected = await BitboxUsbPlatform.instance.completeConnect();
+
+    int tries = 0;
+    while (!isConnected) {
+      print("Tries: $tries");
+      Future.delayed(Duration(milliseconds: 500));
+      isConnected = await BitboxUsbPlatform.instance.completeConnect();
+    }
+
     setState(() => _connectedDevice = usbDevice);
     print("Connected!");
 

@@ -119,11 +119,13 @@ func ChannelHashVerify(ok bool) {
 }
 
 //export InitDevice
-func InitDevice() {
+func InitDevice() bool {
 	err := bitbox.Init()
 	if err != nil {
-		panic(err)
+		return false
 	}
+
+	return true
 }
 
 //export SupportsETH

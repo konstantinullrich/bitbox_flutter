@@ -19,12 +19,12 @@ class BitboxDevice {
     required this.configurationCount,
   });
 
-  factory BitboxDevice.fromIdentifier(String identifier) {
+  factory BitboxDevice.fromIdentifier(String identifier, {String? name}) {
     return BitboxDevice(
       identifier: identifier,
       vendorId: 0,
       productId: 0,
-      productName: '',
+      productName: name ?? '',
       deviceId: 0,
       deviceName: '',
       manufacturerName: '',

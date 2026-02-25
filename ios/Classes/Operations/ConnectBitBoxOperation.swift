@@ -18,9 +18,15 @@ class ConnectBitBoxOperation: MethodCallOperation {
         methodCall: FlutterMethodCall,
         result: FlutterResult
     ) {
-        let identifier: String? = (methodCall.arguments as? Dictionary<String, String>)!["identifier"]
+        let identifier = methodCall.arguments as? String
 
         self.manager.connect(to: UUID(uuidString: identifier!)!)
+        let pInfo = self.manager.parseProduct()
+        if (pInfo == nil) {
+            result(false)
+            return
+        }
+
         result(true)
     }
 }
