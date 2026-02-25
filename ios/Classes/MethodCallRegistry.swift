@@ -1,4 +1,5 @@
 import Flutter
+import Api
 
 class MethodCallRegistry {
     private var operations: [String: MethodCallOperation] = [:]

@@ -2,11 +2,32 @@ import Flutter
 import UIKit
 
 public class BitboxFlutterPlugin: NSObject, FlutterPlugin {
-    private let registry = MethodCallRegistry()
+    private let registry: MethodCallRegistry
+    private let bluetoothManager: BluetoothManager
+    
+    init(registry: MethodCallRegistry, bluetoothManager: BluetoothManager) {
+        self.registry = registry
+        self.bluetoothManager = bluetoothManager
+    }
     
   public static func register(with registrar: FlutterPluginRegistrar) {
+    let registry = MethodCallRegistry()
+    let bluetoothManager = BluetoothManager()
+
+      registry.registerMethodCall(method: "getDevices", operation: ScanDevicesOperation(manager: bluetoothManager))
+      registry.registerMethodCall(method: "initBitBox", operation: InitBitBoxOperation(manager: bluetoothManager))
+      registry.registerMethodCall(method: "requestPermission", operation: StartScanDevicesOperation(manager: bluetoothManager))
+      // registry.registerMethodCall("open", ConnectBitBoxOperation(bluetoothManager))
+      // registry.registerMethodCall("close", CloseOperation(bluetoothManager))
+      registry.registerMethodCall(method: "getChannelHash", operation: GetChannelHashOperation(manager: bluetoothManager))
+      registry.registerMethodCall(method: "channelHashVerify", operation: ChannelHashVerifyOperation(manager: bluetoothManager))
+      // registry.registerMethodCall("getMasterFingerprint", GetMasterFingerprintOperation(bluetoothManager))
+      // registry.registerMethodCall("supportsETH", SupportsETHOperation(bluetoothManager))
+      // registry.registerMethodCall("supportsERC20", SupportsERC20Operation(bluetoothManager))
+      // registry.registerMethodCall("supportsLTC", SupportsLTCOperation(bluetoothManager))
+
     let channel = FlutterMethodChannel(name: "bitbox_usb", binaryMessenger: registrar.messenger())
-    let instance = BitboxFlutterPlugin()
+    let instance = BitboxFlutterPlugin(registry: registry, bluetoothManager: bluetoothManager)
     registrar.addMethodCallDelegate(instance, channel: channel)
   }
 
