@@ -40,8 +40,10 @@ class FinalConnectDeviceOperation: MethodCallOperation {
             return
         }
 
+        let btInfo = BluetoothDeviceInfo(bluetoothManager: manager, productInfo: productInfo)
         do {
-            Api.ApiGetDevice(try BluetoothDeviceInfo(bluetoothManager: manager, productInfo: productInfo).open())
+            let goDevice = try btInfo.open()
+            ApiGetDevice(goDevice)
             result(true)
         } catch {
             result(false)

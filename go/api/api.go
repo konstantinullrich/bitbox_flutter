@@ -1,5 +1,16 @@
 package api
 
+/*
+#cgo CFLAGS: -x objective-c
+#cgo LDFLAGS: -framework Foundation
+#import <Foundation/Foundation.h>
+const char* getSystemTimeZone() {
+    NSTimeZone *timeZone = [NSTimeZone systemTimeZone];
+    NSString *timeZoneName = [timeZone name];
+    return [timeZoneName UTF8String];
+}
+*/
+import "C"
 import (
 	"encoding/binary"
 	"encoding/hex"
@@ -13,7 +24,7 @@ import (
 
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware/mocks"
-	"github.com/konstantinullrich/bitbox_flutter/u2fhid"
+	"github.com/BitBoxSwiss/bitbox02-api-go/communication/u2fhid"
 )
 
 // fixTimezone sets the local timezone on Android. This is a workaround to the bug that on Android,
@@ -24,6 +35,10 @@ import (
 //
 // This fix is copied from https://github.com/golang/go/issues/20455#issuecomment-342287698.
 func fixTimezone() {
+	if runtime.GOOS == "ios" {
+		fixTimezoneIOS()
+		return
+	}
 	if runtime.GOOS != "android" {
 		// Only run the fix on Android.
 		return
@@ -33,6 +48,23 @@ func fixTimezone() {
 		return
 	}
 	z, err := time.LoadLocation(strings.TrimSpace(string(out)))
+	if err != nil {
+		return
+	}
+	time.Local = z
+}
+
+func getSystemTimeZone() string {
+	tz := C.getSystemTimeZone()
+	return C.GoString(tz)
+}
+
+func fixTimezoneIOS() {
+	tzName := strings.TrimSpace(getSystemTimeZone())
+	if len(tzName) == 0 {
+		return
+	}
+	z, err := time.LoadLocation(tzName)
 	if err != nil {
 		return
 	}
@@ -104,7 +136,9 @@ var bitbox *firmware.Device
 func GetDevice(device GoReadWriteCloserInterface) {
 	const bitboxCMD = 0x80 + 0x40 + 0x01
 	comm := u2fhid.NewCommunication(readWriteCloser{device}, bitboxCMD)
-	bitbox = firmware.NewDevice(nil, nil, &mocks.Config{}, comm, &mocks.Logger{})
+	bitbox = firmware.NewDevice(nil, nil, &mocks.Config{}, comm, &mocks.Logger{},
+		firmware.WithOptionalNoisePairingConfirmation(true),
+	)
 }
 
 //export GetChannelHash
@@ -122,7 +156,7 @@ func ChannelHashVerify(ok bool) {
 func InitDevice() bool {
 	err := bitbox.Init()
 	if err != nil {
-		return false
+		panic(err)
 	}
 
 	return true
@@ -146,12 +180,6 @@ func SupportsBluetooth() bool {
 //export SupportsERC20
 func SupportsERC20(contractAddress string) bool {
 	return bitbox.SupportsERC20(contractAddress)
-}
-
-//export DeviceInfo
-func DeviceInfo() firmware.DeviceInfo {
-	info, _ := bitbox.DeviceInfo()
-	return *info
 }
 
 func hexToUint32Slice(hexStr string) ([]uint32, error) {

@@ -457,7 +457,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
 // The interface is currently geared towards USB. For now we pretend to be a USB BitBox02 device.
 // TODO: change interface to be more generic, and use data from the characteristics to determine the
 // product, version, etc.
-class BluetoothDeviceInfo: NSObject, ApiGoDeviceInfoInterfaceProtocol {
+class BluetoothDeviceInfo: NSObject {
     private let bluetoothManager: BluetoothManager
     private let productInfo: ProductInfo
 

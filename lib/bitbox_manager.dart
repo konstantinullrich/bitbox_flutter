@@ -5,6 +5,7 @@ import 'package:bitbox_flutter/usb/bitbox_usb.dart';
 import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
 import 'package:bitbox_flutter/usb/src/bip32_path_helper.dart';
 import 'package:bitbox_flutter/usb/src/bip32_path_to_buffer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class BitboxManager {

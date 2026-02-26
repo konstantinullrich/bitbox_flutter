@@ -16,6 +16,7 @@ class InitBitBoxOperation: MethodCallOperation {
         methodCall: FlutterMethodCall,
         result: FlutterResult
     ) {
-        result(Api.ApiInitDevice())
+        let initialized = Api.ApiInitDevice()
+        result(initialized == true)
     }
 }

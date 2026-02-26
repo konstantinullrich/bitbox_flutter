@@ -18,9 +18,9 @@ public class BitboxFlutterPlugin: NSObject, FlutterPlugin {
       registry.registerMethodCall(method: "iosGetConnectionStatus", operation: GetConnectionStatusOperation(manager: bluetoothManager))
       registry.registerMethodCall(method: "iosFinalConnectDeviceOperation", operation: FinalConnectDeviceOperation(manager: bluetoothManager))
       registry.registerMethodCall(method: "getDevices", operation: ScanDevicesOperation(manager: bluetoothManager))
-      registry.registerMethodCall(method: "initBitBox", operation: InitBitBoxOperation(manager: bluetoothManager))
-      // registry.registerMethodCall(method: "requestPermission", operation: StartScanDevicesOperation(manager: bluetoothManager))
       registry.registerMethodCall(method: "open", operation: ConnectBitBoxOperation(manager: bluetoothManager))
+
+      registry.registerMethodCall(method: "initBitBox", operation: InitBitBoxOperation(manager: bluetoothManager))
       // registry.registerMethodCall(method: "close", CloseOperation(bluetoothManager))
       registry.registerMethodCall(method: "getChannelHash", operation: GetChannelHashOperation(manager: bluetoothManager))
       registry.registerMethodCall(method: "channelHashVerify", operation: ChannelHashVerifyOperation(manager: bluetoothManager))

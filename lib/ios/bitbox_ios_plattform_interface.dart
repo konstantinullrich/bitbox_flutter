@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:bitbox_flutter/usb/bitbox_device.dart';
 import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
@@ -69,8 +70,13 @@ class MethodChannelBitboxIos extends BitboxUsbPlatform {
 
   @override
   Future<bool> initBitBox() async {
+    final token = RootIsolateToken.instance;
     print('[bitbox_flutter] initBitBox');
-    final result = await methodChannel.invokeMethod<bool>('initBitBox');
+    final result = await Isolate.run(() {
+      BackgroundIsolateBinaryMessenger.ensureInitialized(token!);
+
+      return methodChannel.invokeMethod<bool>('initBitBox');
+    });
     print('[bitbox_flutter] initBitBox $result');
 
     return result ?? false;
