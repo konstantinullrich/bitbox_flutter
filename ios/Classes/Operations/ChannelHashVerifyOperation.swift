@@ -16,7 +16,7 @@ class ChannelHashVerifyOperation: MethodCallOperation {
         methodCall: FlutterMethodCall,
         result: FlutterResult
     ) {
-        Api.ApiChannelHashVerify(true)
+        ApiChannelHashVerify(true)
         result(true)
     }
 }

@@ -26,6 +26,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
+  int tries = 0;
+  String currentState = "";
   final _bitboxFlutterPlugin = BitboxManager();
 
   @override
@@ -53,22 +55,39 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> onPressDevice(BitboxDevice usbDevice) async {
     await _bitboxFlutterPlugin.connect(usbDevice);
+    setState(() {
+      currentState ="start completeConnect";
+  });
 
     bool isConnected = await BitboxUsbPlatform.instance.completeConnect();
 
-    int tries = 0;
+    setState(() {
+      currentState ="completeConnect";
+      tries = 0;
+    });
+
     while (!isConnected) {
       print("Tries: $tries");
-      Future.delayed(Duration(milliseconds: 500));
+      setState(() => tries++);
+      await Future.delayed(Duration(milliseconds: 500));
       isConnected = await BitboxUsbPlatform.instance.completeConnect();
+    }
+    // setState(() => currentState ="completeConnect end");
+    print("Connected!");
+
+
+    setState(() => currentState = "initBitBox");
+    try {
+      final init = await _bitboxFlutterPlugin.initBitBox();
+      setState(() => currentState = "initBitBox $init end");
+    } catch (e) {
+      print(e);
+      setState(() => currentState = "$e");
     }
 
     setState(() => _connectedDevice = usbDevice);
-    print("Connected!");
 
-    await _bitboxFlutterPlugin.initBitBox();
-
-    await BitboxUsbPlatform.instance.channelHashVerify();
+    await _bitboxFlutterPlugin.channelHashVerify();
     final masterFP = await _bitboxFlutterPlugin.getMasterFingerprint();
 
     print("masterFP: $masterFP");
@@ -91,7 +110,7 @@ class _MyAppState extends State<MyApp> {
     debugShowCheckedModeBanner: false,
     home: Scaffold(
       appBar: AppBar(
-        title: const Text('BitBox'),
+        title: Text('BitBox $tries $currentState'),
         actions: [
           IconButton(onPressed: initPlatformState, icon: Icon(Icons.refresh)),
         ],

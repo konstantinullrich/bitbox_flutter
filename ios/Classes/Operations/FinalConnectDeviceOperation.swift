@@ -26,12 +26,6 @@ class FinalConnectDeviceOperation: MethodCallOperation {
             return
         }
 
-        let pInfo = self.manager.parseProduct()
-        if (pInfo == nil) {
-            result(false)
-            return
-        }
-
         let productInfo = manager.parseProduct();
         guard let productInfo = productInfo else {
             // Not ready or explicitly not connected (waiting for the device to enter
@@ -39,6 +33,7 @@ class FinalConnectDeviceOperation: MethodCallOperation {
             result(false)
             return
         }
+        print("BLE: Connected \(productInfo.product)")
 
         let btInfo = BluetoothDeviceInfo(bluetoothManager: manager, productInfo: productInfo)
         do {

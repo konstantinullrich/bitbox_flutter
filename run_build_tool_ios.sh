@@ -5,5 +5,7 @@ export PATH=$PATH:~/go/bin
 gomobile init || go install golang.org/x/mobile/cmd/gomobile@latest
 gomobile init
 
-echo "Binding Bitbox to Android"
-gomobile bind -o $1 -target=android -androidapi 24 .
+cd ./go/api
+
+echo "Binding Bitbox to iOS"
+gomobile bind -o ../../ios/Api.xcframework -x -a -tags="timetzdata" -trimpath -target ios,iossimulator .
