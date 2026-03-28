@@ -4,8 +4,8 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:bitbox_flutter/bitbox_manager.dart';
-import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
 import 'package:bitbox_flutter/usb/bitbox_device.dart';
+import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
 import 'package:bitbox_flutter_example/widgets/bitbox_device_card.dart';
 import 'package:convert/convert.dart';
 import 'package:flutter/material.dart';
@@ -26,23 +26,15 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
-  int tries = 0;
-  String currentState = "";
   final _bitboxFlutterPlugin = BitboxManager();
 
   @override
   void initState() {
     super.initState();
-    // initPlatformState();
+    initPlatformState();
   }
 
-  bool uninit = true;
   Future<void> initPlatformState() async {
-    if (uninit) {
-      await BitboxUsbPlatform.instance.requestPermission(BitboxDevice.fromIdentifier(""));
-      uninit = false;
-    }
-
     List<BitboxDevice> device;
     device = await _bitboxFlutterPlugin.devices;
     if (!mounted) return;
@@ -55,39 +47,11 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> onPressDevice(BitboxDevice usbDevice) async {
     await _bitboxFlutterPlugin.connect(usbDevice);
-    setState(() {
-      currentState ="start completeConnect";
-  });
-
-    bool isConnected = await BitboxUsbPlatform.instance.completeConnect();
-
-    setState(() {
-      currentState ="completeConnect";
-      tries = 0;
-    });
-
-    while (!isConnected) {
-      print("Tries: $tries");
-      setState(() => tries++);
-      await Future.delayed(Duration(milliseconds: 500));
-      isConnected = await BitboxUsbPlatform.instance.completeConnect();
-    }
-    // setState(() => currentState ="completeConnect end");
     print("Connected!");
 
+    await _bitboxFlutterPlugin.initBitBox();
 
-    setState(() => currentState = "initBitBox");
-    try {
-      final init = await _bitboxFlutterPlugin.initBitBox();
-      setState(() => currentState = "initBitBox $init end");
-    } catch (e) {
-      print(e);
-      setState(() => currentState = "$e");
-    }
-
-    setState(() => _connectedDevice = usbDevice);
-
-    await _bitboxFlutterPlugin.channelHashVerify();
+    await BitboxUsbPlatform.instance.channelHashVerify();
     final masterFP = await _bitboxFlutterPlugin.getMasterFingerprint();
 
     print("masterFP: $masterFP");
@@ -103,6 +67,8 @@ class _MyAppState extends State<MyApp> {
     );
 
     print("LTC: $ltc\nETH: $eth\nBASE: $base\ndEURO: $deuro\nUSDC: $usdc");
+
+    setState(() => _connectedDevice = usbDevice);
   }
 
   @override
@@ -110,29 +76,23 @@ class _MyAppState extends State<MyApp> {
     debugShowCheckedModeBanner: false,
     home: Scaffold(
       appBar: AppBar(
-        title: Text('BitBox $tries $currentState'),
-        actions: [
-          IconButton(onPressed: initPlatformState, icon: Icon(Icons.refresh)),
-        ],
+        title: const Text('BitBox'),
+        actions: [IconButton(onPressed: initPlatformState, icon: Icon(Icons.refresh))],
       ),
-      body:
-          _connectedDevice != null
-              ? BitboxScreen(
-                usbDevice: _connectedDevice!,
-                usbManager: _bitboxFlutterPlugin,
-              )
-              : Center(
-                child: ListView.builder(
-                  itemCount: _devices.length,
-                  itemBuilder: (context, i) {
-                    final device = _devices[i];
-                    return GestureDetector(
-                      onTap: () => onPressDevice(device),
-                      child: BitboxDeviceCard(device: device),
-                    );
-                  },
-                ),
+      body: _connectedDevice != null
+          ? BitboxScreen(usbDevice: _connectedDevice!, usbManager: _bitboxFlutterPlugin)
+          : Center(
+              child: ListView.builder(
+                itemCount: _devices.length,
+                itemBuilder: (context, i) {
+                  final device = _devices[i];
+                  return GestureDetector(
+                    onTap: () => onPressDevice(device),
+                    child: BitboxDeviceCard(device: device),
+                  );
+                },
               ),
+            ),
     ),
   );
 }
@@ -141,11 +101,7 @@ class BitboxScreen extends StatefulWidget {
   final BitboxDevice usbDevice;
   final BitboxManager usbManager;
 
-  const BitboxScreen({
-    super.key,
-    required this.usbDevice,
-    required this.usbManager,
-  });
+  const BitboxScreen({super.key, required this.usbDevice, required this.usbManager});
 
   @override
   State<StatefulWidget> createState() => _BitboxScreenState();
@@ -161,11 +117,7 @@ class _BitboxScreenState extends State<BitboxScreen> {
         children: <Widget>[
           MaterialButton(
             onPressed: () async {
-              final address = await widget.usbManager.getBTCXPub(
-                0,
-                "m/84'/0'/0'",
-                1,
-              );
+              final address = await widget.usbManager.getBTCXPub(0, "m/84'/0'/0'", 1);
               print(address);
             },
             child: const Text("Get BTC XPub"),
@@ -188,10 +140,7 @@ class _BitboxScreenState extends State<BitboxScreen> {
         children: <Widget>[
           MaterialButton(
             onPressed: () async {
-              final address = await widget.usbManager.getETHAddress(
-                1,
-                "m/44'/60'/0'/0/0",
-              );
+              final address = await widget.usbManager.getETHAddress(1, "m/44'/60'/0'/0/0", 0, true);
               print(address);
             },
             child: const Text("Get ETH Address"),
@@ -270,7 +219,6 @@ class _BitboxScreenState extends State<BitboxScreen> {
           ),
         ],
       ),
-
     ],
   );
 }

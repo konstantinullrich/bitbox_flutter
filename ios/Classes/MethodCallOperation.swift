@@ -8,5 +8,5 @@
 import Flutter
 
 class MethodCallOperation {
-    func onMethodCall(methodCall: FlutterMethodCall, result: FlutterResult) {}
+    func onMethodCall(methodCall: FlutterMethodCall, result: @escaping FlutterResult) {}
 }

@@ -14,7 +14,7 @@ class GetChannelHashOperation: MethodCallOperation {
 
     override func onMethodCall(
         methodCall: FlutterMethodCall,
-        result: FlutterResult
+        result: @escaping FlutterResult
     ) {
         let hash = Api.ApiGetChannelHash()
         result(hash)

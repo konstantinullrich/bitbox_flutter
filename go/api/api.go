@@ -22,9 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BitBoxSwiss/bitbox02-api-go/api/common"
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware/mocks"
 	"github.com/BitBoxSwiss/bitbox02-api-go/communication/u2fhid"
+	"github.com/BitBoxSwiss/bitbox02-api-go/util/semver"
 )
 
 // fixTimezone sets the local timezone on Android. This is a workaround to the bug that on Android,
@@ -131,6 +133,38 @@ func (d deviceInfo) Open() (io.ReadWriteCloser, error) {
 }
 
 var bitbox *firmware.Device
+
+//export GetDeviceWithInfo
+func GetDeviceWithInfo(device GoReadWriteCloserInterface, versionStr string, productStr string) {
+	const bitboxCMD = 0x80 + 0x40 + 0x01
+	comm := u2fhid.NewCommunication(readWriteCloser{device}, bitboxCMD)
+
+	version, err := semver.NewSemVerFromString(strings.TrimPrefix(versionStr, "v"))
+	if err != nil {
+		panic(fmt.Sprintf("invalid version: %s", versionStr))
+	}
+
+	var product common.Product
+	switch productStr {
+	case "bb02p-multi", "BitBox02 Nova Multi":
+		product = common.ProductBitBox02PlusMulti
+	case "bb02p-btconly", "BitBox02 Nova BTC-only":
+		product = common.ProductBitBox02PlusBTCOnly
+	case "bb02p-bl-multi", "BitBox02 Nova Multi bl":
+		product = common.ProductBitBox02PlusMulti
+	case "bb02p-bl-btconly", "BitBox02 Nova BTC-only bl":
+		product = common.ProductBitBox02PlusBTCOnly
+	// Original BitBox02 (non-Nova) products
+	case "BitBox02Multi":
+		product = common.ProductBitBox02Multi
+	case "BitBox02BTCOnly":
+		product = common.ProductBitBox02BTCOnly
+	default:
+		product = common.ProductBitBox02PlusMulti
+	}
+
+	bitbox = firmware.NewDevice(version, &product, &mocks.Config{}, comm, &mocks.Logger{})
+}
 
 //export GetDevice
 func GetDevice(device GoReadWriteCloserInterface) {

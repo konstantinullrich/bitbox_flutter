@@ -16,7 +16,7 @@ class GetConnectionStatusOperation: MethodCallOperation {
     
     override func onMethodCall(
         methodCall: FlutterMethodCall,
-        result: FlutterResult
+        result: @escaping FlutterResult
     ) {
         let conStatus = self.manager.isConnected()
         result(conStatus)

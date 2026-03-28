@@ -16,7 +16,7 @@ class ConnectBitBoxOperation: MethodCallOperation {
     
     override func onMethodCall(
         methodCall: FlutterMethodCall,
-        result: FlutterResult
+        result: @escaping FlutterResult
     ) {
         let identifier = methodCall.arguments as? String
 

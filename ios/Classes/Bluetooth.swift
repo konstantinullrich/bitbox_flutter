@@ -56,10 +56,14 @@ class BLEConnectionContext {
     let semaphore = DispatchSemaphore(value: 0)
     var readBuffer = Data()
     var readBufferLock = NSLock()
+    // Track received packets to detect and skip duplicates
+    // Key: packet data hash, Value: true if seen
+    var seenPackets: Set<Data> = []
 }
 
 class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeripheralDelegate {
-    private var state: State = State(
+    // Made internal for plugin access
+    var state: State = State(
         bluetoothAvailable: false,
         scanning: false,
         discoveredPeripherals: [:]
@@ -72,6 +76,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
     var pProduct: CBCharacteristic?
 
     private var isPaired: Bool = false
+    private var notificationsEnabled: Bool = false
 
     // Peripherals in this set will not be auto-connected even if previously paired.
     // This is for failed connections to not enter an infinite connect loop.
@@ -94,9 +99,35 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         return isPaired && connectedPeripheral != nil && pReader != nil && pWriter != nil
     }
 
+    func isBLEReady() -> Bool {
+        return connectedPeripheral != nil && pReader != nil && pWriter != nil && pProduct != nil && notificationsEnabled
+    }
+
+    func clearReadBuffer() {
+        currentContextLock.lock()
+        if let ctx = currentContext {
+            ctx.readBufferLock.lock()
+            ctx.readBuffer.removeAll()
+            ctx.seenPackets.removeAll()
+            // Drain semaphore to match the cleared buffer — prevents stale signals
+            // from unblocking a future readBlocking() call with no data
+            while ctx.semaphore.wait(timeout: .now()) == .success {}
+            ctx.readBufferLock.unlock()
+        }
+        currentContextLock.unlock()
+    }
+
     func connect(to peripheralID: UUID) {
         guard var metadata = state.discoveredPeripherals[peripheralID] else { return }
         centralManager.stopScan()
+
+        // Reset characteristics for fresh connection
+        pWriter = nil
+        pReader = nil
+        pProduct = nil
+        isPaired = false
+        notificationsEnabled = false
+
         metadata.connectionError = nil
         metadata.connectionState = .connecting
         state.discoveredPeripherals[peripheralID] = metadata
@@ -108,10 +139,10 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         centralManager.connect(metadata.peripheral, options: nil)
     }
 
-    private func restartScan() {
+    func restartScan() {
         guard centralManager.state == .poweredOn,
-            !centralManager.isScanning,
-            connectedPeripheral == nil
+              !centralManager.isScanning,
+              connectedPeripheral == nil
         else { return }
         state.discoveredPeripherals.removeAll()
         state.scanning = true
@@ -225,23 +256,46 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
             for c in characteristics {
                 print("BLE: Discovered characteristic: \(c.uuid)")
                 if c.uuid == CBUUID(string: "799d485c-d354-4ed0-b577-f8ee79ec275a") {
-                    pWriter = c
-                    let max_len = peripheral.maximumWriteValueLength(
-                        for: CBCharacteristicWriteType.withoutResponse)
-                    print(
-                        "BLE: Found writer service with max length \(max_len) - \(c.properties.contains(.write))"
-                    )
+                    if pWriter == nil {
+                        pWriter = c
+                        let max_len = peripheral.maximumWriteValueLength(
+                            for: CBCharacteristicWriteType.withoutResponse)
+                        print(
+                            "BLE: Found writer service with max length \(max_len) - \(c.properties.contains(.write))"
+                        )
+                    }
                 }
                 if c.uuid == CBUUID(string: "419572a5-9f53-4eb1-8db7-61bcab928867") {
-                    peripheral.setNotifyValue(true, for: c)
-                    pReader = c
+                    if pReader == nil {
+                        print("BLE: Found reader characteristic, enabling notifications")
+                        peripheral.setNotifyValue(true, for: c)
+                        pReader = c
+                    }
                 }
                 if c.uuid == CBUUID(string: "9d1c9a77-8b03-4e49-8053-3955cda7da93") {
-                    print("BLE: Found product characteristic")
-                    peripheral.setNotifyValue(true, for: c)
-                    pProduct = c
+                    if pProduct == nil {
+                        print("BLE: Found product characteristic")
+                        peripheral.setNotifyValue(true, for: c)
+                        pProduct = c
+                    }
                 }
             }
+        }
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?
+    ) {
+        if let error = error {
+            print("BLE: Error enabling notifications for \(characteristic.uuid): \(error)")
+            return
+        }
+        print("BLE: Notifications enabled for \(characteristic.uuid)")
+
+        // Track when reader notifications are enabled
+        if characteristic == pReader {
+            notificationsEnabled = true
+            print("BLE: Reader notifications now enabled, ready for communication")
         }
     }
 
@@ -259,6 +313,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         _ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
         error: Error?
     ) {
+        print("BLE: didUpdateValueFor \(characteristic.uuid)")
         if let error = error {
             print("BLE: Error receiving data: \(error)")
             return
@@ -266,6 +321,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
 
         currentContextLock.lock()
         guard let ctx = currentContext else {
+            print("BLE: WARNING - no currentContext, dropping data")
             currentContextLock.unlock()
             return
         }
@@ -275,13 +331,22 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
             if data.count != 64 {
                 print("BLE: ERROR, expected 64 bytes")
             }
-            print("BLE: received data: \(data.hexEncodedString())")
-            ctx.readBufferLock.lock()
-            ctx.readBuffer.append(data)
-            ctx.readBufferLock.unlock()
 
-            // Signal the semaphore to unblock `readBlocking`
+            // Deduplicate: skip if we've already seen this exact packet
+            ctx.readBufferLock.lock()
+            if ctx.seenPackets.contains(data) {
+                print("BLE: skipping duplicate packet: \(data.prefix(8).hexEncodedString())...")
+                ctx.readBufferLock.unlock()
+                return
+            }
+            ctx.seenPackets.insert(data)
+
+            print("BLE: received data: \(data.hexEncodedString())")
+            ctx.readBuffer.append(data)
+            // Signal inside lock to keep buffer and semaphore count in sync
+            // This prevents a race with clearReadBuffer() draining the semaphore
             ctx.semaphore.signal()
+            ctx.readBufferLock.unlock()
         }
         if characteristic == pProduct {
             print("BLE: product changed: \(String(describing: parseProduct()))")
@@ -307,6 +372,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         pProduct = nil
         state.discoveredPeripherals.removeAll()
         isPaired = false
+        notificationsEnabled = false
         updateBackendState()
 
         // Have the backend scan right away, which will make it detect that we disconnected.
@@ -335,6 +401,8 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
     }
 
     func readBlocking(length: Int) throws -> Data {
+        // Use isConnected to ensure we're fully paired before reading
+        // This matches the official BitBox app behavior
         if !isConnected() {
             throw ReadError(message: "not connected")
         }
@@ -353,9 +421,15 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
 
         // Loop until we've read the required amount of data
         while data.count < length {
-            // Block until BLE reader callback notifies us or the peripheral is disconnected.
-            ctx.semaphore.wait()
+            // Use a timeout to avoid hanging forever if BLE connection is lost
+            // without didDisconnect being called (e.g. XPC connection interrupted)
+            let waitResult = ctx.semaphore.wait(timeout: .now() + 10)
+            if waitResult == .timedOut {
+                print("BLE: read timed out after 10s")
+                throw ReadError(message: "read timed out")
+            }
 
+            // Check connection state after waking up
             if !isConnected() {
                 throw ReadError(message: "the peripheral has disconnected while reading")
             }
@@ -367,8 +441,11 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
             }
 
             ctx.readBufferLock.lock()
-            data.append(ctx.readBuffer.prefix(64))
-            ctx.readBuffer.removeSubrange(..<64)
+            let available = min(64, ctx.readBuffer.count)
+            if available > 0 {
+                data.append(ctx.readBuffer.prefix(available))
+                ctx.readBuffer.removeSubrange(..<available)
+            }
             ctx.readBufferLock.unlock()
         }
         print("BLE: got \(data.count)")
@@ -378,7 +455,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
 
     func parseProduct() -> ProductInfo? {
         guard let pProduct = self.pProduct,
-            let value = pProduct.value
+              let value = pProduct.value
         else {
             return nil
         }
@@ -545,10 +622,18 @@ class BluetoothReadWriteCloser: NSObject, ApiGoReadWriteCloserInterfaceProtocol 
 
     func write(_ data: Data?, n: UnsafeMutablePointer<Int>?) throws {
         guard let data = data, let p = bluetoothManager.connectedPeripheral,
-            let pWriter = bluetoothManager.pWriter
+              let pWriter = bluetoothManager.pWriter
         else {
             n!.pointee = 0
             return
+        }
+
+        // Clear stale data from the read buffer before sending a new u2fhid request.
+        // Only on init frames (CMD byte has bit 7 set) — not on continuation frames.
+        // This prevents stale BLE notifications (e.g. hwwRspBusy arriving during
+        // a sleep) from being consumed as the response to a subsequent request.
+        if data.count > 4 && data[4] & 0x80 != 0 {
+            bluetoothManager.clearReadBuffer()
         }
 
         // This is the max char len according to BLE firmware

@@ -14,9 +14,13 @@ class ChannelHashVerifyOperation: MethodCallOperation {
 
     override func onMethodCall(
         methodCall: FlutterMethodCall,
-        result: FlutterResult
+        result: @escaping FlutterResult
     ) {
-        ApiChannelHashVerify(true)
-        result(true)
+        DispatchQueue.global().async {
+            ApiChannelHashVerify(true)
+            DispatchQueue.main.async {
+                result(true)
+            }
+        }
     }
 }
