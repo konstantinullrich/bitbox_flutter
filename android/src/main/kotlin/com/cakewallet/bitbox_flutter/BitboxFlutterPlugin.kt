@@ -33,6 +33,8 @@ class BitboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var usbManager: UsbManager
     private lateinit var registry: MethodCallRegistry
     private lateinit var bitboxManager: BitboxManager
+    private lateinit var transportChannel: MethodChannel
+    private lateinit var transport: BitboxUsbTransport
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.getBinaryMessenger(), "bitbox_usb")
@@ -40,6 +42,10 @@ class BitboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
         context = binding.getApplicationContext()
         usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
         bitboxManager = BitboxManager(usbManager)
+
+        transport = BitboxUsbTransport(usbManager)
+        transportChannel = MethodChannel(binding.getBinaryMessenger(), BitboxUsbTransport.CHANNEL)
+        transportChannel.setMethodCallHandler(transport)
 
 
         // Register the method calls
@@ -75,5 +81,7 @@ class BitboxFlutterPlugin : FlutterPlugin, MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
         registry.clear()
+        transportChannel.setMethodCallHandler(null)
+        transport.dispose()
     }
 }
