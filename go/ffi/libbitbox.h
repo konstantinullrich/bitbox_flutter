@@ -21,6 +21,12 @@ extern const char *_GoStringPtr(_GoString_ s);
 /* Start of preamble from import "C" comments.  */
 
 
+#line 3 "events.go"
+
+#include "bridge.h"
+
+#line 1 "cgo-generated-wrapper"
+
 #line 11 "main.go"
 
 #include "bridge.h"
@@ -87,6 +93,7 @@ typedef struct { void *data; GoInt len; GoInt cap; } GoSlice;
 extern "C" {
 #endif
 
+extern void BBSetEventCallback(bb_event_fn fn);
 extern void BBRegister(bb_io_request_fn io, bb_result_fn result);
 extern void BBDeliverIO(int64_t reqID, int32_t status, uint8_t* data, int32_t length);
 extern void BBFree(uint8_t* p);

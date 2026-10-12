@@ -14,6 +14,10 @@ static inline void bb_call_io(bb_io_request_fn fn, int64_t id, int32_t op, uint8
 static inline void bb_call_result(bb_result_fn fn, int64_t id, int32_t status, uint8_t *data, int32_t len) {
 	fn(id, status, data, len);
 }
+
+static inline void bb_call_event(bb_event_fn fn, uint8_t *data, int32_t len) {
+	fn(data, len);
+}
 */
 import "C"
 
@@ -25,6 +29,10 @@ func callIO(fn C.bb_io_request_fn, id int64, op C.int32_t, data *C.uint8_t, leng
 
 func callResult(fn C.bb_result_fn, id int64, status int32, data *C.uint8_t, length int) {
 	C.bb_call_result(fn, C.int64_t(id), C.int32_t(status), data, C.int32_t(length))
+}
+
+func callEvent(fn C.bb_event_fn, data *C.uint8_t, length int) {
+	C.bb_call_event(fn, data, C.int32_t(length))
 }
 
 // cBytes copies b into C memory that Dart releases with BBFree. Returns nil for empty input.

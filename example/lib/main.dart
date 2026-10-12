@@ -25,6 +25,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
+  bool _pairing = false;
+  String? _pairingCode;
   final _bitboxFlutterPlugin = BitboxFfiManager();
 
   @override
@@ -45,13 +47,40 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> onPressDevice(BitboxDevice usbDevice) async {
-    await _bitboxFlutterPlugin.connect(usbDevice);
-    setState(() => _connectedDevice = usbDevice);
-    print("Connected!");
+    // Init blocks until the user accepts the pairing code on the device, so the code
+    // arrives as an event while it is still running.
+    final events = _bitboxFlutterPlugin.events.listen((event) {
+      if (event.event == 'channelHashChanged' &&
+          event.channelHash.isNotEmpty &&
+          !event.channelHashVerified) {
+        setState(() => _pairingCode = event.channelHash);
+      }
+    });
 
-    await _bitboxFlutterPlugin.initBitBox();
+    try {
+      await _bitboxFlutterPlugin.connect(usbDevice);
+      setState(() {
+        _connectedDevice = usbDevice;
+        _pairing = true;
+      });
+      print("Connected!");
 
-    await _bitboxFlutterPlugin.channelHashVerify();
+      await _bitboxFlutterPlugin.initBitBox();
+      await _bitboxFlutterPlugin.channelHashVerify();
+    } catch (e) {
+      print("Pairing failed: $e");
+      if (mounted) setState(() => _connectedDevice = null);
+      return;
+    } finally {
+      await events.cancel();
+      if (mounted) {
+        setState(() {
+          _pairing = false;
+          _pairingCode = null;
+        });
+      }
+    }
+
     final masterFP = await _bitboxFlutterPlugin.getMasterFingerprint();
 
     print("masterFP: $masterFP");
@@ -80,7 +109,9 @@ class _MyAppState extends State<MyApp> {
         ],
       ),
       body:
-          _connectedDevice != null
+          _pairing
+              ? PairingView(pairingCode: _pairingCode)
+              : _connectedDevice != null
               ? BitboxScreen(
                 usbDevice: _connectedDevice!,
                 usbManager: _bitboxFlutterPlugin,
@@ -99,6 +130,53 @@ class _MyAppState extends State<MyApp> {
               ),
     ),
   );
+}
+
+class PairingView extends StatelessWidget {
+  /// Null until the device has generated the code.
+  final String? pairingCode;
+
+  const PairingView({super.key, required this.pairingCode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = pairingCode;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (code == null) ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text("Connecting to BitBox…"),
+            ] else ...[
+              Text("Pairing code", style: theme.textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Text(
+                code,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Check that your BitBox shows the same code, then confirm on the device.",
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              const CircularProgressIndicator(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class BitboxScreen extends StatefulWidget {
@@ -234,7 +312,6 @@ class _BitboxScreenState extends State<BitboxScreen> {
           ),
         ],
       ),
-
     ],
   );
 }

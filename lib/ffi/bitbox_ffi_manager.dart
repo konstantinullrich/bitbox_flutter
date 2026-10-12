@@ -7,6 +7,9 @@ import 'package:bitbox_flutter/usb/bitbox_usb.dart';
 import 'package:bitbox_flutter/usb/src/bip32_path_helper.dart';
 import 'package:bitbox_flutter/usb/src/bip32_path_to_buffer.dart';
 
+export 'package:bitbox_flutter/ffi/bitbox_ffi.dart'
+    show BitboxEvent, BitboxFfiException;
+
 /// Drop-in replacement for `BitboxManager` that talks to the Go library over dart:ffi
 /// instead of the gomobile bindings. Device listing and USB permission still use the
 /// existing `bitbox_usb` method channel; neither touches gomobile.
@@ -36,7 +39,20 @@ class BitboxFfiManager {
     return _ffi.close();
   }
 
-  Future<void> initBitBox() => _ffi.initDevice();
+  /// Firmware events, including the pairing code during [initBitBox].
+  Stream<BitboxEvent> get events => _ffi.events;
+
+  /// Pairs with the device. Listen to [events] first to show the pairing code; this
+  /// completes once the user accepted it on the device.
+  Future<void> initBitBox() async {
+    final status = await _ffi.initDevice();
+    if (status == 'pairingFailed') {
+      throw BitboxFfiException('Pairing was rejected on the device');
+    }
+    if (status == 'require_app_upgrade') {
+      throw BitboxFfiException('Device firmware requires a newer app version');
+    }
+  }
 
   Future<String> getChannelHash() => _ffi.getChannelHash();
 

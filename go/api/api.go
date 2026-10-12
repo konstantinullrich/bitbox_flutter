@@ -107,6 +107,12 @@ func GetDevice(device GoReadWriteCloserInterface) {
 	bitbox = firmware.NewDevice(nil, nil, &mocks.Config{}, comm, &mocks.Logger{})
 }
 
+// Device returns the device created by GetDevice, for callers that need the full firmware
+// API (e.g. events). Not usable through gomobile.
+func Device() *firmware.Device {
+	return bitbox
+}
+
 //export GetChannelHash
 func GetChannelHash() string {
 	hash, _ := bitbox.ChannelHash()

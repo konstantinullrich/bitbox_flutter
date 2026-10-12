@@ -25,6 +25,42 @@ class BitboxFfiException implements Exception {
   String toString() => 'BitboxFfiException: $message';
 }
 
+/// A firmware event with a snapshot of the pairing state.
+///
+/// During pairing, a `channelHashChanged` event with a non-empty [channelHash] and
+/// [channelHashVerified] == false means the code is on the device screen and waiting
+/// for the user; a second one with [channelHashVerified] == true follows once accepted.
+class BitboxEvent {
+  BitboxEvent({
+    required this.event,
+    required this.status,
+    required this.channelHash,
+    required this.channelHashVerified,
+  });
+
+  factory BitboxEvent.fromJson(Map<String, dynamic> json) => BitboxEvent(
+        event: json['event'] as String,
+        status: json['status'] as String,
+        channelHash: json['channelHash'] as String,
+        channelHashVerified: json['channelHashVerified'] as bool,
+      );
+
+  /// `channelHashChanged`, `statusChanged` or `attestationCheckDone`.
+  final String event;
+
+  /// Device status, e.g. `connected`, `unpaired`, `pairingFailed`, `initialized`.
+  final String status;
+
+  /// The pairing code, formatted as on the device (two lines of two 5-char groups).
+  final String channelHash;
+
+  final bool channelHashVerified;
+
+  @override
+  String toString() =>
+      'BitboxEvent($event, status: $status, verified: $channelHashVerified)';
+}
+
 // Must match go/ffi/bridge.h.
 const _ioRead = 0;
 const _ioWrite = 1;
@@ -34,6 +70,8 @@ typedef _IoRequestNative = Void Function(
     Int64 reqId, Int32 op, Pointer<Uint8> data, Int32 len);
 typedef _ResultNative = Void Function(
     Int64 callId, Int32 status, Pointer<Uint8> data, Int32 len);
+
+typedef _EventNative = Void Function(Pointer<Uint8> data, Int32 len);
 
 typedef _CallC = Void Function(Int64);
 typedef _CallDart = void Function(int);
@@ -65,6 +103,11 @@ class BitboxFfi {
         void Function(Pointer<NativeFunction<_IoRequestNative>>,
             Pointer<NativeFunction<_ResultNative>>)>('BBRegister')(
         _ioCallable.nativeFunction, _resultCallable.nativeFunction);
+
+    _eventCallable = NativeCallable<_EventNative>.listener(_onEvent);
+    _lib.lookupFunction<Void Function(Pointer<NativeFunction<_EventNative>>),
+            void Function(Pointer<NativeFunction<_EventNative>>)>(
+        'BBSetEventCallback')(_eventCallable.nativeFunction);
   }
 
   final DynamicLibrary _lib;
@@ -72,6 +115,12 @@ class BitboxFfi {
 
   late final NativeCallable<_IoRequestNative> _ioCallable;
   late final NativeCallable<_ResultNative> _resultCallable;
+  late final NativeCallable<_EventNative> _eventCallable;
+
+  final _events = StreamController<BitboxEvent>.broadcast();
+
+  /// Firmware events; listen before [initDevice] to receive the pairing code.
+  Stream<BitboxEvent> get events => _events.stream;
 
   late final _free = _lib.lookupFunction<Void Function(Pointer<Uint8>),
       void Function(Pointer<Uint8>)>('BBFree');
@@ -146,7 +195,10 @@ class BitboxFfi {
 
   Future<void> close() => _call((id, _) => _close(id));
 
-  Future<void> initDevice() => _call((id, _) => _initDevice(id));
+  /// Runs pairing; completes once the user accepted or rejected the code on the device.
+  /// Returns the resulting status (`unpaired` on success, see [BitboxEvent.status]).
+  Future<String> initDevice() =>
+      _call((id, _) => _initDevice(id)).then(utf8.decode);
 
   Future<String> getChannelHash() =>
       _call((id, _) => _getChannelHash(id)).then(utf8.decode);
@@ -262,6 +314,8 @@ class BitboxFfi {
   void dispose() {
     _ioCallable.close();
     _resultCallable.close();
+    _eventCallable.close();
+    _events.close();
     for (final c in _pending.values) {
       c.completeError(BitboxFfiException('disposed'));
     }
@@ -297,6 +351,11 @@ class BitboxFfi {
     } else {
       completer.completeError(BitboxFfiException(utf8.decode(bytes)));
     }
+  }
+
+  void _onEvent(Pointer<Uint8> data, int len) {
+    final json = jsonDecode(utf8.decode(_takeBytes(data, len)));
+    _events.add(BitboxEvent.fromJson(json as Map<String, dynamic>));
   }
 
   static bool _toBool(Uint8List bytes) => bytes.isNotEmpty && bytes[0] == 1;

@@ -18,6 +18,10 @@ typedef void (*bb_io_request_fn)(int64_t req_id, int32_t op, uint8_t *data, int3
 // the result; status != 0 = error and data holds a UTF-8 error message.
 typedef void (*bb_result_fn)(int64_t call_id, int32_t status, uint8_t *data, int32_t len);
 
+// Go reports a firmware event (e.g. the pairing code became available) as UTF-8 JSON:
+// {"event", "status", "channelHash", "channelHashVerified"}.
+typedef void (*bb_event_fn)(uint8_t *data, int32_t len);
+
 enum {
   BB_IO_READ = 0,
   BB_IO_WRITE = 1,

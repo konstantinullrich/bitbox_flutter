@@ -176,6 +176,7 @@ func BBFree(p *C.uint8_t) {
 func BBOpen(callID C.int64_t) {
 	runAsync(callID, func() ([]byte, error) {
 		api.GetDevice(dartTransport{})
+		forwardEvents(api.Device())
 		return nil, nil
 	})
 }
@@ -190,11 +191,15 @@ func BBClose(callID C.int64_t) {
 	})
 }
 
+// BBInitDevice runs the attestation check, unlock and noise pairing. It blocks until the user
+// accepts or rejects the pairing code on the device and returns the resulting status, e.g.
+// "unpaired" (confirm with BBChannelHashVerify) or "pairingFailed".
+//
 //export BBInitDevice
 func BBInitDevice(callID C.int64_t) {
 	runAsync(callID, func() ([]byte, error) {
 		api.InitDevice()
-		return nil, nil
+		return []byte(api.Device().Status()), nil
 	})
 }
 
