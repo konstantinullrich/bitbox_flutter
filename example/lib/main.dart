@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:bitbox_flutter/bitbox_manager.dart';
-import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
+import 'package:bitbox_flutter/ffi/bitbox_ffi_manager.dart';
 import 'package:bitbox_flutter/usb/bitbox_device.dart';
 import 'package:bitbox_flutter_example/widgets/bitbox_device_card.dart';
 import 'package:convert/convert.dart';
@@ -26,7 +25,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
-  final _bitboxFlutterPlugin = BitboxManager();
+  final _bitboxFlutterPlugin = BitboxFfiManager();
 
   @override
   void initState() {
@@ -52,7 +51,7 @@ class _MyAppState extends State<MyApp> {
 
     await _bitboxFlutterPlugin.initBitBox();
 
-    await BitboxUsbPlatform.instance.channelHashVerify();
+    await _bitboxFlutterPlugin.channelHashVerify();
     final masterFP = await _bitboxFlutterPlugin.getMasterFingerprint();
 
     print("masterFP: $masterFP");
@@ -104,7 +103,7 @@ class _MyAppState extends State<MyApp> {
 
 class BitboxScreen extends StatefulWidget {
   final BitboxDevice usbDevice;
-  final BitboxManager usbManager;
+  final BitboxFfiManager usbManager;
 
   const BitboxScreen({
     super.key,
