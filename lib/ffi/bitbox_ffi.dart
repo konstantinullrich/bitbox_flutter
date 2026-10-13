@@ -4,17 +4,9 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:bitbox_flutter/ffi/libbitbox.g.dart';
+import 'package:bitbox_flutter/src/transport/bitbox_transport.dart';
 import 'package:ffi/ffi.dart';
-
-/// Raw USB access to a BitBox. Implemented per platform (e.g. a method channel to Kotlin
-/// doing `bulkTransfer` on a background thread, or hidapi on desktop).
-abstract interface class BitboxTransport {
-  Future<Uint8List> read(int length);
-
-  Future<void> write(Uint8List data);
-
-  Future<void> close();
-}
 
 class BitboxFfiException implements Exception {
   BitboxFfiException(this.message);
@@ -73,9 +65,6 @@ typedef _ResultNative = Void Function(
 
 typedef _EventNative = Void Function(Pointer<Uint8> data, Int32 len);
 
-typedef _CallC = Void Function(Int64);
-typedef _CallDart = void Function(int);
-
 DynamicLibrary _openLibrary() {
   if (Platform.isAndroid || Platform.isLinux) {
     return DynamicLibrary.open('libbitbox.so');
@@ -85,32 +74,18 @@ DynamicLibrary _openLibrary() {
   return DynamicLibrary.process();
 }
 
-/// Async bridge to the Go BitBox library (go/ffi).
-///
-/// No call into Go blocks: Go runs device operations in goroutines, asks Dart for USB
-/// transfers through [_onIoRequest] and reports results through [_onResult]. Both are
-/// `NativeCallable.listener`s, so Go may invoke them from any thread.
-///
-/// Keypaths are passed packed (see `packDerivationPath`); big integers as hex strings.
 class BitboxFfi {
-  BitboxFfi(this._transport, [DynamicLibrary? lib])
-      : _lib = lib ?? _openLibrary() {
+  BitboxFfi(this._transport)
+      : _lib = BitBoxFlutter(_openLibrary()) {
     _ioCallable = NativeCallable<_IoRequestNative>.listener(_onIoRequest);
     _resultCallable = NativeCallable<_ResultNative>.listener(_onResult);
-    _lib.lookupFunction<
-        Void Function(Pointer<NativeFunction<_IoRequestNative>>,
-            Pointer<NativeFunction<_ResultNative>>),
-        void Function(Pointer<NativeFunction<_IoRequestNative>>,
-            Pointer<NativeFunction<_ResultNative>>)>('BBRegister')(
-        _ioCallable.nativeFunction, _resultCallable.nativeFunction);
+    _lib.BBRegister(_ioCallable.nativeFunction, _resultCallable.nativeFunction);
 
     _eventCallable = NativeCallable<_EventNative>.listener(_onEvent);
-    _lib.lookupFunction<Void Function(Pointer<NativeFunction<_EventNative>>),
-            void Function(Pointer<NativeFunction<_EventNative>>)>(
-        'BBSetEventCallback')(_eventCallable.nativeFunction);
+    _lib.BBSetEventCallback(_eventCallable.nativeFunction);
   }
 
-  final DynamicLibrary _lib;
+  final BitBoxFlutter _lib;
   final BitboxTransport _transport;
 
   late final NativeCallable<_IoRequestNative> _ioCallable;
@@ -122,121 +97,57 @@ class BitboxFfi {
   /// Firmware events; listen before [initDevice] to receive the pairing code.
   Stream<BitboxEvent> get events => _events.stream;
 
-  late final _free = _lib.lookupFunction<Void Function(Pointer<Uint8>),
-      void Function(Pointer<Uint8>)>('BBFree');
-  late final _deliverIO = _lib.lookupFunction<
-      Void Function(Int64, Int32, Pointer<Uint8>, Int32),
-      void Function(int, int, Pointer<Uint8>, int)>('BBDeliverIO');
-
-  late final _open = _lib.lookupFunction<_CallC, _CallDart>('BBOpen');
-  late final _close = _lib.lookupFunction<_CallC, _CallDart>('BBClose');
-  late final _initDevice =
-      _lib.lookupFunction<_CallC, _CallDart>('BBInitDevice');
-  late final _getChannelHash =
-      _lib.lookupFunction<_CallC, _CallDart>('BBGetChannelHash');
-  late final _channelHashVerify = _lib.lookupFunction<
-      Void Function(Int64, Bool), void Function(int, bool)>('BBChannelHashVerify');
-  late final _getMasterFingerprint =
-      _lib.lookupFunction<_CallC, _CallDart>('BBGetMasterFingerprint');
-  late final _supportsETH = _lib.lookupFunction<Void Function(Int64, Int64),
-      void Function(int, int)>('BBSupportsETH');
-  late final _supportsLTC =
-      _lib.lookupFunction<_CallC, _CallDart>('BBSupportsLTC');
-  late final _supportsERC20 = _lib.lookupFunction<
-      Void Function(Int64, Pointer<Utf8>),
-      void Function(int, Pointer<Utf8>)>('BBSupportsERC20');
-
-  late final _btcXPub = _lib.lookupFunction<
-      Void Function(Int64, Int32, Pointer<Uint8>, Int32, Int32, Bool),
-      void Function(int, int, Pointer<Uint8>, int, int, bool)>('BBBTCXPub');
-  late final _btcSignPsbt = _lib.lookupFunction<
-      Void Function(Int64, Int32, Pointer<Uint8>, Int32),
-      void Function(int, int, Pointer<Uint8>, int)>('BBBTCSignPSBT');
-  late final _btcSignMessage = _lib.lookupFunction<
-      Void Function(Int64, Int32, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32),
-      void Function(
-          int, int, Pointer<Uint8>, int, Pointer<Uint8>, int)>('BBBTCSignMessage');
-
-  late final _ethGetAddress = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Int32, Bool),
-      void Function(int, int, Pointer<Uint8>, int, int, bool)>('BBETHGetAddress');
-  late final _ethSignTransaction = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Int64, Pointer<Utf8>,
-          Int64, Pointer<Uint8>, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Int32),
-      void Function(int, int, Pointer<Uint8>, int, int, Pointer<Utf8>, int,
-          Pointer<Uint8>, int, Pointer<Utf8>, Pointer<Uint8>, int, int)>(
-      'BBETHSignTransaction');
-  late final _ethSignEIP1559 = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Int64, Pointer<Utf8>,
-          Pointer<Utf8>, Int64, Pointer<Uint8>, Int32, Pointer<Utf8>,
-          Pointer<Uint8>, Int32, Int32),
-      void Function(int, int, Pointer<Uint8>, int, int, Pointer<Utf8>,
-          Pointer<Utf8>, int, Pointer<Uint8>, int, Pointer<Utf8>,
-          Pointer<Uint8>, int, int)>('BBETHSignEIP1559');
-  late final _ethSignRLPTx = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Pointer<Utf8>, Bool),
-      void Function(
-          int, int, Pointer<Uint8>, int, Pointer<Utf8>, bool)>('BBETHSignRLPTx');
-  late final _ethSignMessage = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32),
-      void Function(
-          int, int, Pointer<Uint8>, int, Pointer<Uint8>, int)>('BBETHSignMessage');
-  late final _ethSignTypedMessage = _lib.lookupFunction<
-      Void Function(Int64, Int64, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32),
-      void Function(int, int, Pointer<Uint8>, int, Pointer<Uint8>,
-          int)>('BBETHSignTypedMessage');
-
   int _nextCallId = 0;
   final _pending = <int, Completer<Uint8List>>{};
 
   // --- Public API -------------------------------------------------------------------------
 
-  Future<void> open() => _call((id, _) => _open(id));
+  Future<void> open() => _call((id, _) => _lib.BBOpen(id));
 
-  Future<void> close() => _call((id, _) => _close(id));
+  Future<void> close() => _call((id, _) => _lib.BBClose(id));
 
   /// Runs pairing; completes once the user accepted or rejected the code on the device.
   /// Returns the resulting status (`unpaired` on success, see [BitboxEvent.status]).
   Future<String> initDevice() =>
-      _call((id, _) => _initDevice(id)).then(utf8.decode);
+      _call((id, _) => _lib.BBInitDevice(id)).then(utf8.decode);
 
   Future<String> getChannelHash() =>
-      _call((id, _) => _getChannelHash(id)).then(utf8.decode);
+      _call((id, _) => _lib.BBGetChannelHash(id)).then(utf8.decode);
 
   Future<void> channelHashVerify(bool ok) =>
-      _call((id, _) => _channelHashVerify(id, ok));
+      _call((id, _) => _lib.BBChannelHashVerify(id, ok));
 
   Future<Uint8List> getMasterFingerprint() =>
-      _call((id, _) => _getMasterFingerprint(id));
+      _call((id, _) => _lib.BBGetMasterFingerprint(id));
 
   Future<bool> supportsETH(int chainId) =>
-      _call((id, _) => _supportsETH(id, chainId)).then(_toBool);
+      _call((id, _) => _lib.BBSupportsETH(id, chainId)).then(_toBool);
 
-  Future<bool> supportsLTC() => _call((id, _) => _supportsLTC(id)).then(_toBool);
+  Future<bool> supportsLTC() => _call((id, _) => _lib.BBSupportsLTC(id)).then(_toBool);
 
   Future<bool> supportsERC20(String contractAddress) =>
-      _call((id, a) => _supportsERC20(id, a.str(contractAddress))).then(_toBool);
+      _call((id, a) => _lib.BBSupportsERC20(id, a.str(contractAddress))).then(_toBool);
 
   Future<String> getBTCXPub(
           int coinType, Uint8List keypath, int addressType, bool display) =>
-      _call((id, a) => _btcXPub(id, coinType, a.bytes(keypath), keypath.length,
+      _call((id, a) => _lib.BBBTCXPub(id, coinType, a.bytes(keypath), keypath.length,
           addressType, display)).then(utf8.decode);
 
   Future<String> signBTCPsbt(int coinType, String psbt) {
     final encoded = utf8.encode(psbt);
     return _call((id, a) =>
-            _btcSignPsbt(id, coinType, a.bytes(encoded), encoded.length))
+        _lib.BBBTCSignPSBT(id, coinType, a.bytes(encoded), encoded.length))
         .then(utf8.decode);
   }
 
   Future<Uint8List> signBTCMessage(
           int coinType, Uint8List keypath, Uint8List message) =>
-      _call((id, a) => _btcSignMessage(id, coinType, a.bytes(keypath),
+      _call((id, a) => _lib.BBBTCSignMessage(id, coinType, a.bytes(keypath),
           keypath.length, a.bytes(message), message.length));
 
   Future<String> getETHAddress(
           int chainId, Uint8List keypath, int outputType, bool display) =>
-      _call((id, a) => _ethGetAddress(id, chainId, a.bytes(keypath),
+      _call((id, a) => _lib.BBETHGetAddress(id, chainId, a.bytes(keypath),
           keypath.length, outputType, display)).then(utf8.decode);
 
   Future<Uint8List> signETHTransaction(
@@ -250,7 +161,7 @@ class BitboxFfi {
     Uint8List data,
     int recipientAddressCase,
   ) =>
-      _call((id, a) => _ethSignTransaction(
+      _call((id, a) => _lib.BBETHSignTransaction(
             id,
             chainId,
             a.bytes(keypath),
@@ -278,7 +189,7 @@ class BitboxFfi {
     Uint8List data,
     int recipientAddressCase,
   ) =>
-      _call((id, a) => _ethSignEIP1559(
+      _call((id, a) => _lib.BBETHSignEIP1559(
             id,
             chainId,
             a.bytes(keypath),
@@ -297,17 +208,17 @@ class BitboxFfi {
 
   Future<Uint8List> signETHRLPTransaction(int chainId, Uint8List keypath,
           String encodedTxHex, bool isEIP1559) =>
-      _call((id, a) => _ethSignRLPTx(id, chainId, a.bytes(keypath),
+      _call((id, a) => _lib.BBETHSignRLPTx(id, chainId, a.bytes(keypath),
           keypath.length, a.str(encodedTxHex), isEIP1559));
 
   Future<Uint8List> signETHMessage(
           int chainId, Uint8List keypath, Uint8List message) =>
-      _call((id, a) => _ethSignMessage(id, chainId, a.bytes(keypath),
+      _call((id, a) => _lib.BBETHSignMessage(id, chainId, a.bytes(keypath),
           keypath.length, a.bytes(message), message.length));
 
   Future<Uint8List> signETHTypedMessage(
           int chainId, Uint8List keypath, Uint8List jsonMessage) =>
-      _call((id, a) => _ethSignTypedMessage(id, chainId, a.bytes(keypath),
+      _call((id, a) => _lib.BBETHSignTypedMessage(id, chainId, a.bytes(keypath),
           keypath.length, a.bytes(jsonMessage), jsonMessage.length));
 
   /// Releases the callbacks. Only call once no Go operation is in flight.
@@ -378,7 +289,7 @@ class BitboxFfi {
   void _deliver(int reqId, int status, List<int> bytes) {
     final arena = Arena();
     try {
-      _deliverIO(reqId, status, arena.bytes(bytes), bytes.length);
+      _lib.BBDeliverIO(reqId, status, arena.bytes(bytes), bytes.length);
     } finally {
       arena.releaseAll();
     }
@@ -388,7 +299,7 @@ class BitboxFfi {
   Uint8List _takeBytes(Pointer<Uint8> data, int len) {
     if (data == nullptr) return Uint8List(0);
     final bytes = Uint8List.fromList(data.asTypedList(len));
-    _free(data);
+    _lib.BBFree(data);
     return bytes;
   }
 }
@@ -401,5 +312,6 @@ extension on Arena {
     return ptr;
   }
 
-  Pointer<Utf8> str(String s) => s.toNativeUtf8(allocator: this);
+  /// The generated bindings declare C strings as `char *`, i.e. `Pointer<Char>`.
+  Pointer<Char> str(String s) => s.toNativeUtf8(allocator: this).cast();
 }

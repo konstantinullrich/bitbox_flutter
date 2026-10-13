@@ -31,5 +31,6 @@ migrate_working_dir/
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
+*.g.dart
 
-
+android/src/main/jniLibs/**

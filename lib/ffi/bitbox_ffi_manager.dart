@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:bitbox_flutter/ffi/bitbox_ffi.dart';
-import 'package:bitbox_flutter/ffi/method_channel_transport.dart';
 import 'package:bitbox_flutter/src/bitbox_device.dart';
+import 'package:bitbox_flutter/src/transport/bitbox_usb_transport.dart';
 import 'package:bitbox_flutter/usb/bitbox_usb.dart';
 import 'package:bitbox_flutter/src/utils/bip32_path_helper.dart';
 import 'package:bitbox_flutter/src/utils/bip32_path_to_buffer.dart';
@@ -16,7 +16,7 @@ class BitboxFfiManager {
   bool _disposed = false;
 
   final _bitboxUsb = BitboxUsb();
-  final _transport = MethodChannelBitboxTransport();
+  final _transport = BitboxUsbTransport();
   late final _ffi = BitboxFfi(_transport);
 
   Future<List<BitboxDevice>> get devices {
