@@ -2,17 +2,16 @@ import 'dart:typed_data';
 
 import 'package:bitbox_flutter/ffi/bitbox_ffi.dart';
 import 'package:bitbox_flutter/ffi/method_channel_transport.dart';
-import 'package:bitbox_flutter/usb/bitbox_device.dart';
+import 'package:bitbox_flutter/src/bitbox_device.dart';
 import 'package:bitbox_flutter/usb/bitbox_usb.dart';
-import 'package:bitbox_flutter/usb/src/bip32_path_helper.dart';
-import 'package:bitbox_flutter/usb/src/bip32_path_to_buffer.dart';
+import 'package:bitbox_flutter/src/utils/bip32_path_helper.dart';
+import 'package:bitbox_flutter/src/utils/bip32_path_to_buffer.dart';
 
 export 'package:bitbox_flutter/ffi/bitbox_ffi.dart'
     show BitboxEvent, BitboxFfiException;
 
-/// Drop-in replacement for `BitboxManager` that talks to the Go library over dart:ffi
-/// instead of the gomobile bindings. Device listing and USB permission still use the
-/// existing `bitbox_usb` method channel; neither touches gomobile.
+/// Talks to the Go library over dart:ffi. Device listing and USB permission use the
+/// `bitbox_usb` method channel; device I/O goes through [MethodChannelBitboxTransport].
 class BitboxFfiManager {
   bool _disposed = false;
 

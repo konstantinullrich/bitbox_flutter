@@ -1,2 +1,2 @@
-export 'bitbox_manager.dart';
-export 'usb/bitbox_device.dart';
+export 'ffi/bitbox_ffi_manager.dart';
+export 'src/bitbox_device.dart';

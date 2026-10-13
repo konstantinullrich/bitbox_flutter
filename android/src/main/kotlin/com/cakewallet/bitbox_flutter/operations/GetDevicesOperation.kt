@@ -1,12 +1,12 @@
 package com.cakewallet.bitbox_flutter.operations
 
 import android.content.Context
-import com.cakewallet.bitbox_flutter.BitboxManager
+import android.hardware.usb.UsbManager
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-class GetDevicesOperation(manager: BitboxManager) :
-    UsbMethodCallOperation(manager.usbManager) {
+class GetDevicesOperation(usbManager: UsbManager) :
+    UsbMethodCallOperation(usbManager) {
     override fun onMethodCall(
         context: Context,
         methodCall: MethodCall,

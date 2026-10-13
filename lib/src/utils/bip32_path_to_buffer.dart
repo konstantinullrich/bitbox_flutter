@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import './buffer.dart';
+import 'buffer.dart';
 
 Uint8List packDerivationPath(List<int> path) {
   final inputWriter = ByteDataWriter();

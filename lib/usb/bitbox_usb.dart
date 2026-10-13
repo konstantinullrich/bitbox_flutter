@@ -1,4 +1,4 @@
-import 'package:bitbox_flutter/usb/bitbox_device.dart';
+import 'package:bitbox_flutter/src/bitbox_device.dart';
 import 'package:bitbox_flutter/usb/bitbox_usb_platform_interface.dart';
 
 class BitboxUsb {
@@ -7,9 +7,4 @@ class BitboxUsb {
 
   Future<bool> requestPermission(BitboxDevice usbDevice) =>
       BitboxUsbPlatform.instance.requestPermission(usbDevice);
-
-  Future<bool> open(BitboxDevice usbDevice) =>
-      BitboxUsbPlatform.instance.open(usbDevice);
-
-  Future<bool> close() => BitboxUsbPlatform.instance.close();
 }
