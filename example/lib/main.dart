@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:bitbox_flutter/ffi/bitbox_ffi_manager.dart';
-import 'package:bitbox_flutter/usb/bitbox_device.dart';
+import 'package:bitbox_flutter/bitbox_flutter.dart';
+import 'package:bitbox_flutter/src/bitbox_connection_manager.dart';
 import 'package:bitbox_flutter_example/widgets/bitbox_device_card.dart';
 import 'package:convert/convert.dart';
 import 'package:flutter/material.dart';
@@ -25,9 +25,10 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
+  BitboxConnection? _connection;
   bool _pairing = false;
   String? _pairingCode;
-  final _bitboxFlutterPlugin = BitboxFfiManager();
+  final _bitboxFlutterPlugin = BitboxUsbConnectionManager();
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _devices = device;
       _connectedDevice = null;
+      _connection = null;
     });
   }
 
@@ -58,15 +60,16 @@ class _MyAppState extends State<MyApp> {
     });
 
     try {
-      await _bitboxFlutterPlugin.connect(usbDevice);
+      final connection = await _bitboxFlutterPlugin.connect(usbDevice);
       setState(() {
         _connectedDevice = usbDevice;
+        _connection = connection;
         _pairing = true;
       });
       print("Connected!");
 
-      await _bitboxFlutterPlugin.initBitBox();
-      await _bitboxFlutterPlugin.channelHashVerify();
+      await _connection!.initBitBox();
+      await _connection!.channelHashVerify();
     } catch (e) {
       print("Pairing failed: $e");
       if (mounted) setState(() => _connectedDevice = null);
@@ -81,17 +84,13 @@ class _MyAppState extends State<MyApp> {
       }
     }
 
-    final masterFP = await _bitboxFlutterPlugin.getMasterFingerprint();
-
-    print("masterFP: $masterFP");
-
-    final ltc = await _bitboxFlutterPlugin.supportsLTC();
-    final eth = await _bitboxFlutterPlugin.supportsETH(1);
-    final base = await _bitboxFlutterPlugin.supportsETH(8453);
-    final deuro = await _bitboxFlutterPlugin.supportsERC20(
+    final ltc = await _connection!.supportsLTC();
+    final eth = await _connection!.supportsETH(1);
+    final base = await _connection!.supportsETH(8453);
+    final deuro = await _connection!.supportsERC20(
       "0xbA3f535bbCcCcA2A154b573Ca6c5A49BAAE0a3ea",
     );
-    final usdc = await _bitboxFlutterPlugin.supportsERC20(
+    final usdc = await _connection!.supportsERC20(
       "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     );
 
@@ -104,18 +103,13 @@ class _MyAppState extends State<MyApp> {
     home: Scaffold(
       appBar: AppBar(
         title: const Text('BitBox'),
-        actions: [
-          IconButton(onPressed: initPlatformState, icon: Icon(Icons.refresh)),
-        ],
+        actions: [IconButton(onPressed: initPlatformState, icon: Icon(Icons.refresh))],
       ),
       body:
           _pairing
               ? PairingView(pairingCode: _pairingCode)
               : _connectedDevice != null
-              ? BitboxScreen(
-                usbDevice: _connectedDevice!,
-                usbManager: _bitboxFlutterPlugin,
-              )
+              ? BitboxScreen(usbDevice: _connectedDevice!, connection: _connection!)
               : Center(
                 child: ListView.builder(
                   itemCount: _devices.length,
@@ -181,13 +175,13 @@ class PairingView extends StatelessWidget {
 
 class BitboxScreen extends StatefulWidget {
   final BitboxDevice usbDevice;
-  final BitboxFfiManager usbManager;
+  final BitboxConnection connection;
+  final BitboxBitcoin bitcoin;
+  final BitboxEthereum ethereum;
 
-  const BitboxScreen({
-    super.key,
-    required this.usbDevice,
-    required this.usbManager,
-  });
+  BitboxScreen({super.key, required this.usbDevice, required this.connection})
+    : bitcoin = BitboxBitcoin(connection.ffi),
+      ethereum = BitboxEthereum(connection.ffi);
 
   @override
   State<StatefulWidget> createState() => _BitboxScreenState();
@@ -203,19 +197,14 @@ class _BitboxScreenState extends State<BitboxScreen> {
         children: <Widget>[
           MaterialButton(
             onPressed: () async {
-              final address = await widget.usbManager.getBTCXPub(
-                0,
-                "m/84'/0'/0'",
-                1,
-              );
+              final address = await widget.bitcoin.getXPub("m/84'/0'/0'");
               print(address);
             },
             child: const Text("Get BTC XPub"),
           ),
           MaterialButton(
             onPressed: () async {
-              final sig = await widget.usbManager.signBTCMessage(
-                0,
+              final sig = await widget.bitcoin.signMessage(
                 "m/84'/0'/0'/0/0",
                 utf8.encode("Hey Bitbox"),
               );
@@ -230,18 +219,14 @@ class _BitboxScreenState extends State<BitboxScreen> {
         children: <Widget>[
           MaterialButton(
             onPressed: () async {
-              final address = await widget.usbManager.getETHAddress(
-                1,
-                "m/44'/60'/0'/0/0",
-              );
+              final address = await widget.ethereum.getAddress("m/44'/60'/0'/0/0");
               print(address);
             },
             child: const Text("Get ETH Address"),
           ),
           MaterialButton(
             onPressed: () async {
-              final sig = await widget.usbManager.signETHMessage(
-                1,
+              final sig = await widget.ethereum.signMessage(
                 "m/44'/60'/0'/0/0",
                 utf8.encode("Hey Bitbox"),
               );
@@ -251,8 +236,7 @@ class _BitboxScreenState extends State<BitboxScreen> {
           ),
           MaterialButton(
             onPressed: () async {
-              final sig = await widget.usbManager.signETHTypedMessage(
-                1,
+              final sig = await widget.ethereum.signTypedMessage(
                 "m/44'/60'/0'/0/0",
                 utf8.encode(
                   '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}',
@@ -264,21 +248,7 @@ class _BitboxScreenState extends State<BitboxScreen> {
           ),
           MaterialButton(
             onPressed: () async {
-              final sig = await widget.usbManager.signETHTypedMessage(
-                1,
-                "m/44'/60'/0'/0/0",
-                utf8.encode(
-                  '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}',
-                ),
-              );
-              print(sig);
-            },
-            child: const Text("Sign Typed Message"),
-          ),
-          MaterialButton(
-            onPressed: () async {
-              final sig = await widget.usbManager.signETHTransaction(
-                1,
+              final sig = await widget.ethereum.signTransaction(
                 "m/44'/60'/0'/0/0",
                 1,
                 BigInt.from(100000000),
@@ -294,8 +264,7 @@ class _BitboxScreenState extends State<BitboxScreen> {
           ),
           MaterialButton(
             onPressed: () async {
-              final sig = await widget.usbManager.signETHTransactionEIP1559(
-                1,
+              final sig = await widget.ethereum.signTransactionEIP1559(
                 "m/44'/60'/0'/0/0",
                 1,
                 BigInt.from(1),
