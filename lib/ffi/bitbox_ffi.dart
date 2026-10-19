@@ -70,7 +70,9 @@ DynamicLibrary _openLibrary() {
     return DynamicLibrary.open('libbitbox.so');
   }
   if (Platform.isWindows) return DynamicLibrary.open('bitbox.dll');
-  // iOS/macOS: statically linked into the app or bundled via the podspec.
+  // Bundled by hook/build.dart.
+  if (Platform.isIOS) return DynamicLibrary.open('bitbox.framework/bitbox');
+  // macOS: statically linked into the app or bundled via the podspec.
   return DynamicLibrary.process();
 }
 
