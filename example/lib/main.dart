@@ -28,7 +28,7 @@ class _MyAppState extends State<MyApp> {
   BitboxConnection? _connection;
   bool _pairing = false;
   String? _pairingCode;
-  final _bitboxFlutterPlugin = BitboxUsbConnectionManager();
+  final _bitboxFlutterPlugin = BitboxBleConnectionManager();
 
   @override
   void initState() {
