@@ -43,26 +43,12 @@ func init() {
 	fixTimezone()
 }
 
-// GoReadWriteCloserInterface adapts io.ReadWriteCloser's Read method to return the byte read byte slice
-// instead of the .Read([]byte) pattern. This is as gomobile bind seems to make a copy of passed
-// slices instead of writing directly to it, so the byte slice never makes it back to Go-land.
+// GoReadWriteCloserInterface adapts io.ReadWriteCloser's Read method to return the read bytes
+// instead of filling a caller-provided slice, which suits transports that live outside Go.
 type GoReadWriteCloserInterface interface {
 	Read(n int) ([]byte, error)
 	io.Writer
 	io.Closer
-}
-
-// GoDeviceInfoInterface adapts usb.DeviceInfo's Open method to return the adapted ReadWriteCloser.
-type GoDeviceInfoInterface interface {
-	IsBluetooth() bool
-	VendorID() int
-	ProductID() int
-	UsagePage() int
-	Interface() int
-	Serial() string
-	Product() string
-	Identifier() string
-	Open() (GoReadWriteCloserInterface, error)
 }
 
 // readWriteCloser implements io.ReadWriteCloser, translating from GoReadWriteCloserInterface. All methods
@@ -83,21 +69,6 @@ func (r readWriteCloser) Read(readBytesOut []byte) (int, error) {
 	return len(readBytes), nil
 }
 
-// deviceInfo implements usb.DeviceInfo, translating from GoDeviceInfoInterface. All methods are as-is except
-// for the Open method.
-type deviceInfo struct {
-	GoDeviceInfoInterface
-}
-
-// Open implements usb.DeviceInfo.
-func (d deviceInfo) Open() (io.ReadWriteCloser, error) {
-	device, err := d.GoDeviceInfoInterface.Open()
-	if err != nil {
-		return nil, err
-	}
-	return readWriteCloser{device}, nil
-}
-
 var bitbox *firmware.Device
 
 //export GetDevice
@@ -105,6 +76,12 @@ func GetDevice(device GoReadWriteCloserInterface) {
 	const bitboxCMD = 0x80 + 0x40 + 0x01
 	comm := u2fhid.NewCommunication(readWriteCloser{device}, bitboxCMD)
 	bitbox = firmware.NewDevice(nil, nil, &mocks.Config{}, comm, &mocks.Logger{})
+}
+
+// Device returns the device created by GetDevice, for callers that need the full firmware
+// API (e.g. events).
+func Device() *firmware.Device {
+	return bitbox
 }
 
 //export GetChannelHash
