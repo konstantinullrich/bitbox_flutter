@@ -55,6 +55,8 @@ class BitboxUsbConnectionManager extends BitboxConnectionManager {
   @override
   List<BitboxDevice> get devices => _devices;
 
+  Future<List<BitboxDevice>> get currentDevices => BitboxUsbPlatform.instance.getDevices();
+
   List<BitboxDevice> _devices = [];
   Timer? _scanTimer;
 
