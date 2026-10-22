@@ -1,38 +1,55 @@
-import 'package:bitbox_flutter/src/bitbox_device.dart';
+import 'package:bitbox_flutter/bitbox_flutter.dart';
 import 'package:flutter/material.dart';
 
 class BitboxDeviceCard extends StatelessWidget {
   final BitboxDevice device;
 
-  const BitboxDeviceCard({super.key, required this.device});
+  /// Shows a chevron and makes the card tappable when set.
+  final VoidCallback? onTap;
+
+  const BitboxDeviceCard({super.key, required this.device, this.onTap});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: EdgeInsets.all(24),
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
-      color: Theme.of(context).colorScheme.surfaceContainer,
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.max,
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        Image.asset("assets/bitbox.png", width: 50),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(left: 16),
-            child: Text(
-              device.productName,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium!.copyWith(fontSize: 20, fontWeight: FontWeight.w500),
-            ),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurfaceVariant;
+
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Image.asset("assets/bitbox.png", width: 48, height: 48),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      device.productName,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      device.deviceName,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: secondary),
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null) Icon(Icons.chevron_right, color: secondary),
+            ],
           ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bitbox_flutter/ffi/bitbox_connection.dart';
 import 'package:bitbox_flutter/ffi/bitbox_ffi.dart';
 import 'package:bitbox_flutter/src/bitbox_device.dart';
@@ -7,20 +9,95 @@ import 'package:bitbox_flutter/src/usb/bitbox_usb_platform_interface.dart';
 import 'package:universal_ble/universal_ble.dart';
 
 abstract class BitboxConnectionManager {
-  Future<List<BitboxDevice>> get devices;
+  List<BitboxDevice> get devices;
+
+  Stream<BitboxEvent> get events;
 
   Future<BitboxConnection> connect(BitboxDevice usbDevice);
+
+  Future<void> stopScan();
+
+  bool _isScanning = false;
+  StreamController<BitboxDevice> _scanController = StreamController.broadcast();
+
+  void _startScan();
+
+  Stream<BitboxDevice> scan() {
+    StreamSubscription<BitboxDevice>? subscription;
+    late final StreamController<BitboxDevice> controller;
+    controller = StreamController(
+      onListen: () {
+        if (!_isScanning) _startScan();
+        subscription = _scanController.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        devices.forEach(controller.add);
+      },
+      onCancel: () => subscription?.cancel(),
+    );
+    return controller.stream;
+  }
 }
 
 class BitboxUsbConnectionManager extends BitboxConnectionManager {
+  BitboxUsbConnectionManager({this.maxScanFrequency = const Duration(seconds: 1)});
+
+  final Duration maxScanFrequency;
+
   final _transport = BitboxUsbTransport();
   late final ffi = BitboxFfi(_transport);
 
-  /// Firmware events, including the pairing code during [initBitBox].
+  @override
   Stream<BitboxEvent> get events => ffi.events;
 
   @override
-  Future<List<BitboxDevice>> get devices => BitboxUsbPlatform.instance.getDevices();
+  List<BitboxDevice> get devices => _devices;
+
+  List<BitboxDevice> _devices = [];
+  Timer? _scanTimer;
+
+  @override
+  void _startScan() {
+    _scanController = StreamController.broadcast();
+    _devices = [];
+    _isScanning = true;
+
+    bool polling = false;
+    Future<void> poll() async {
+      if (polling) return;
+      polling = true;
+      try {
+        final devices = await BitboxUsbPlatform.instance.getDevices();
+        if (_scanController.isClosed) return;
+
+        _devices = devices;
+
+        final known = _devices.map((d) => d.identifier).toSet();
+        for (final device in devices) {
+          if (!known.contains(device.identifier)) _scanController.add(device);
+        }
+
+      } catch (e, s) {
+        if (!_scanController.isClosed) _scanController.addError(e, s);
+      } finally {
+        polling = false;
+      }
+    }
+
+    unawaited(poll());
+    _scanTimer = Timer.periodic(maxScanFrequency, (_) => poll());
+  }
+
+  @override
+  Future<void> stopScan() async {
+    if (!_isScanning) return;
+
+    _isScanning = false;
+    _scanTimer?.cancel();
+    unawaited(_scanController.close());
+  }
 
   @override
   Future<BitboxConnection> connect(BitboxDevice usbDevice) async {
@@ -38,41 +115,77 @@ class BitboxUsbConnectionManager extends BitboxConnectionManager {
 /// Finds and connects to a BitBox02 Nova over Bluetooth LE. [BitboxDevice.identifier] is
 /// the [BleDevice.deviceId].
 class BitboxBleConnectionManager extends BitboxConnectionManager {
-  BitboxBleConnectionManager({this.scanDuration = const Duration(seconds: 5)});
+  BitboxBleConnectionManager({this.maxScanDuration = const Duration(minutes: 5)});
 
-  /// How long [devices] scans for advertising devices.
-  final Duration scanDuration;
+  final Duration maxScanDuration;
 
   final _transport = BitboxBleTransport();
   late final ffi = BitboxFfi(_transport);
 
-  /// Firmware events, including the pairing code during [initBitBox].
+  @override
   Stream<BitboxEvent> get events => ffi.events;
 
-  /// Already connected or bonded BitBoxes, plus the ones advertising during [scanDuration].
-  @override
-  Future<List<BitboxDevice>> get devices async {
-    await UniversalBle.requestPermissions();
+  StreamSubscription<BleDevice>? _scanStreamSubscription;
+  Timer? _scanTimeout;
+  Map<String, BitboxDevice> _foundDevices = {};
 
-    final found = <String, BleDevice>{};
-    for (final device in await UniversalBle.getSystemDevices(
-        withServices: [BitboxBleTransport.serviceUuid])) {
-      found[device.deviceId] = device;
+  @override
+  void _startScan() {
+    _scanController = StreamController.broadcast();
+    _foundDevices = {};
+    _isScanning = true;
+    unawaited(_performBleScan());
+  }
+
+  Future<void> _performBleScan() async {
+    void onFound(BleDevice device) {
+      if (_scanController.isClosed || _foundDevices.containsKey(device.deviceId)) return;
+
+      final bbDevice = _toBitboxDevice(device);
+      _foundDevices[device.deviceId] = bbDevice;
+      _scanController.add(bbDevice);
     }
 
-    final scan = UniversalBle.scanStream.listen((d) => found[d.deviceId] = d);
     try {
+      await UniversalBle.requestPermissions();
+
+      (await UniversalBle.getSystemDevices(
+        withServices: [BitboxBleTransport.serviceUuid],
+      )).forEach(onFound);
+
+      if (_scanController.isClosed) return;
+
+      _scanStreamSubscription = UniversalBle.scanStream.listen(onFound);
       await UniversalBle.startScan(
         scanFilter: ScanFilter(withServices: [BitboxBleTransport.serviceUuid]),
       );
-      await Future<void>.delayed(scanDuration);
-    } finally {
-      await scan.cancel();
-      await UniversalBle.stopScan();
-    }
 
-    return [for (final d in found.values) _toBitboxDevice(d)];
+      if (!_scanController.isClosed) {
+        _scanTimeout = Timer(maxScanDuration, () => unawaited(stopScan()));
+      }
+    } catch (e, s) {
+      if (_scanController.isClosed) return;
+      _scanController.addError(e, s);
+      await stopScan();
+    }
   }
+
+  @override
+  Future<void> stopScan() async {
+    if (!_isScanning) return;
+
+    try {
+      await UniversalBle.stopScan();
+    } finally {
+      _isScanning = false;
+      _scanTimeout?.cancel();
+      unawaited(_scanStreamSubscription?.cancel());
+      unawaited(_scanController.close());
+    }
+  }
+
+  @override
+  List<BitboxDevice> get devices => _foundDevices.values.toList();
 
   @override
   Future<BitboxConnection> connect(BitboxDevice device) async {
@@ -85,13 +198,13 @@ class BitboxBleConnectionManager extends BitboxConnectionManager {
   }
 
   static BitboxDevice _toBitboxDevice(BleDevice device) => BitboxDevice(
-        identifier: device.deviceId,
-        vendorId: 0,
-        productId: 0,
-        productName: device.name ?? 'BitBox02',
-        deviceId: 0,
-        deviceName: device.name ?? device.deviceId,
-        manufacturerName: 'Shift Crypto',
-        configurationCount: 0,
-      );
+    identifier: device.deviceId,
+    vendorId: 0,
+    productId: 0,
+    productName: device.name ?? 'BitBox02',
+    deviceId: 0,
+    deviceName: device.name ?? device.deviceId,
+    manufacturerName: 'Shift Crypto',
+    configurationCount: 0,
+  );
 }
