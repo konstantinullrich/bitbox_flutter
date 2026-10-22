@@ -32,5 +32,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 build/
 *.g.dart
+# Generated ffigen bindings must ship with the package for git/pub consumers.
+!lib/ffi/libbitbox.g.dart
 
 android/src/main/jniLibs/**
