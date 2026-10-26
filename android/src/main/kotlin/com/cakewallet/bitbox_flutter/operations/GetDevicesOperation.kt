@@ -24,6 +24,7 @@ class GetDevicesOperation(usbManager: UsbManager) :
             map.put("productName", entry.value.productName)
             map.put("manufacturerName", entry.value.manufacturerName)
             map.put("configurationCount", entry.value.configurationCount)
+            map.put("isUsb", true)
             devices.add(map)
         }
 

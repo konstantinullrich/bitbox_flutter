@@ -208,5 +208,6 @@ class BitboxBleConnectionManager extends BitboxConnectionManager {
     deviceName: device.name ?? device.deviceId,
     manufacturerName: 'Shift Crypto',
     configurationCount: 0,
+    isUsb: false,
   );
 }
