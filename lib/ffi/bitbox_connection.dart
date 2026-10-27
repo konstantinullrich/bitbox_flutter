@@ -1,13 +1,22 @@
+import 'dart:async';
+
+import 'package:bitbox_flutter/src/transport/bitbox_transport.dart';
+
 import 'bitbox_ffi.dart';
 
 /// Talks to the Go library over dart:ffi. Device listing and USB permission use the
 /// `bitbox_usb` method channel; device I/O goes through [MethodChannelBitboxTransport].
 class BitboxConnection {
-  BitboxConnection(this.ffi);
+  BitboxConnection(this.ffi, this._transport);
 
   final BitboxFfi ffi;
-
+  final BitboxTransport _transport;
   bool _disposed = false;
+
+  BitboxConnectionStatus get status => _transport.connectionState;
+
+  /// Emits every change of [status].
+  Stream<BitboxConnectionStatus> get statusChanges => _transport.connectionStateChanges;
 
   Future<void> disconnect() {
     _checkDisposed();

@@ -74,9 +74,8 @@ class BitboxUsbConnectionManager extends BitboxConnectionManager {
         final devices = await BitboxUsbPlatform.instance.getDevices();
         if (_scanController.isClosed) return;
 
-        _devices = devices;
-
         final known = _devices.map((d) => d.identifier).toSet();
+        _devices = devices;
         for (final device in devices) {
           if (!known.contains(device.identifier)) _scanController.add(device);
         }
@@ -110,7 +109,7 @@ class BitboxUsbConnectionManager extends BitboxConnectionManager {
 
     await ffi.open();
 
-    return BitboxConnection(ffi);
+    return BitboxConnection(ffi, _transport);
   }
 }
 
@@ -196,7 +195,7 @@ class BitboxBleConnectionManager extends BitboxConnectionManager {
 
     await ffi.open();
 
-    return BitboxConnection(ffi);
+    return BitboxConnection(ffi, _transport);
   }
 
   static BitboxDevice _toBitboxDevice(BleDevice device) => BitboxDevice(

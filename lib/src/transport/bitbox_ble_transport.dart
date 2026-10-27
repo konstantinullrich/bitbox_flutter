@@ -12,7 +12,7 @@ import 'package:universal_ble/universal_ble.dart';
 /// The device exposes the same u2fhid packets as over USB: every notification on the
 /// reader characteristic is one 64-byte packet, and writes must be multiples of 64 bytes.
 /// GATT layout as in the BitBoxApp (frontends/ios/BitBoxApp/BitBoxApp/Bluetooth.swift).
-class BitboxBleTransport implements BitboxTransport {
+class BitboxBleTransport extends BitboxTransport {
   static const serviceUuid = 'e1511a45-f3db-44c0-82b8-6c880790d1f1';
   static const writerUuid = '799d485c-d354-4ed0-b577-f8ee79ec275a';
   static const readerUuid = '419572a5-9f53-4eb1-8db7-61bcab928867';
@@ -25,9 +25,6 @@ class BitboxBleTransport implements BitboxTransport {
 
   /// ATT header bytes that don't count towards the payload.
   static const _attOverhead = 3;
-
-  /// Leaves the user time to confirm the system pairing dialog.
-  static const _pairingTimeout = Duration(minutes: 2);
 
   String? _deviceId;
   int _writeSize = _packetSize;
@@ -48,12 +45,20 @@ class BitboxBleTransport implements BitboxTransport {
     if (_deviceId != null) await close();
     _error = null;
     _buffer.clear();
+    setConnectionState(BitboxConnectionStatus.connecting);
 
-    await UniversalBle.connect(deviceId);
+    try {
+      await UniversalBle.connect(deviceId);
+    } catch (_) {
+      setConnectionState(BitboxConnectionStatus.disconnected);
+      rethrow;
+    }
     _deviceId = deviceId;
     try {
       _connection = UniversalBle.connectionStream(deviceId).listen((connected) {
-        if (!connected) _fail('the device disconnected');
+        if (connected) return;
+        _fail('the device disconnected');
+        setConnectionState(BitboxConnectionStatus.disconnected);
       });
 
       final services = await UniversalBle.discoverServices(deviceId);
@@ -87,6 +92,7 @@ class BitboxBleTransport implements BitboxTransport {
       } else {
         await UniversalBle.subscribeIndications(deviceId, serviceUuid, readerUuid);
       }
+      setConnectionState(BitboxConnectionStatus.connected);
     } catch (_) {
       await close();
       rethrow;
@@ -156,6 +162,7 @@ class BitboxBleTransport implements BitboxTransport {
     if (deviceId == null) return;
     _deviceId = null;
     _fail('transport closed');
+    setConnectionState(BitboxConnectionStatus.disconnected);
 
     await _notifications?.cancel();
     await _connection?.cancel();

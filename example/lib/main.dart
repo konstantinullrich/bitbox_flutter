@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bitbox_flutter/bitbox_flutter.dart';
+import 'package:bitbox_flutter_example/widgets/bitbox_connection_indicator.dart';
 import 'package:bitbox_flutter_example/widgets/bitbox_device_card.dart';
 import 'package:convert/convert.dart';
 import 'package:flutter/material.dart';
@@ -24,8 +25,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _manager = BitboxBleConnectionManager();
+  final _manager = BitboxUsbConnectionManager();
   StreamSubscription<BitboxDevice>? _scanSubscription;
+  StreamSubscription<BitboxConnectionStatus>? _statusSubscription;
 
   List<BitboxDevice> _devices = [];
   BitboxDevice? _connectedDevice;
@@ -43,6 +45,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    _statusSubscription?.cancel();
     _stopScan();
     super.dispose();
   }
@@ -56,6 +59,8 @@ class _MyAppState extends State<MyApp> {
   /// Restarts the scan, so the list only shows devices that are still around.
   Future<void> _startScan() async {
     await _stopScan();
+    await _statusSubscription?.cancel();
+    _statusSubscription = null;
     if (!mounted) return;
 
     setState(() {
@@ -84,13 +89,17 @@ class _MyAppState extends State<MyApp> {
     });
 
     setState(() => _pairing = true);
-    final BitboxConnection connection;
+    BitboxConnection? connection;
     try {
       connection = await _manager.connect(device);
+      _watchStatus(connection);
       await connection.initBitBox();
       await connection.channelHashVerify();
     } catch (e) {
       print("Pairing failed: $e");
+      await _statusSubscription?.cancel();
+      _statusSubscription = null;
+      if (mounted) setState(() => _connection = null);
       return;
     } finally {
       await events.cancel();
@@ -116,6 +125,18 @@ class _MyAppState extends State<MyApp> {
     print("LTC: $ltc\nETH: $eth\nBASE: $base\ndEURO: $deuro\nUSDC: $usdc");
   }
 
+  /// Shows [connection] in the app bar and goes back to scanning once the device is gone.
+  void _watchStatus(BitboxConnection connection) {
+    setState(() => _connection = connection);
+    _statusSubscription = connection.statusChanges.listen((status) {
+      // While pairing, a lost device fails the pairing call instead.
+      if (status != BitboxConnectionStatus.disconnected || _connectedDevice == null) return;
+      print("BitBox disconnected");
+      unawaited(connection.disconnect().catchError((_) {}));
+      _startScan();
+    });
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -124,6 +145,8 @@ class _MyAppState extends State<MyApp> {
       appBar: AppBar(
         title: const Text('BitBox'),
         actions: [
+          if (_connection case final connection?)
+            BitboxConnectionIndicator(connection: connection),
           IconButton(onPressed: _startScan, icon: const Icon(Icons.refresh), tooltip: 'Scan again'),
         ],
       ),

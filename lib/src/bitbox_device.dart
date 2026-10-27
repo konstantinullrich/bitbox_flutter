@@ -30,7 +30,7 @@ class BitboxDevice {
     deviceName: map['deviceName'],
     manufacturerName: map['manufacturerName'] ?? '',
     configurationCount: map['configurationCount'] ?? 0,
-    isUsb: map['isUsb'] ?? bool,
+    isUsb: map['isUsb'] ?? false,
   );
 
   Map<String, dynamic> toMap() => {
