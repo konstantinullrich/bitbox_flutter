@@ -14,7 +14,7 @@ package main
 import "C"
 
 import (
-	"encoding/hex"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
@@ -136,6 +136,19 @@ func goBytes(data *C.uint8_t, length C.int32_t) []byte {
 	return C.GoBytes(unsafe.Pointer(data), C.int(length))
 }
 
+// keypathOf decodes a keypath sent by Dart as big-endian uint32s. It panics on a malformed
+// keypath, so only call it inside runAsync.
+func keypathOf(b []byte) []uint32 {
+	if len(b)%4 != 0 {
+		panic(fmt.Sprintf("keypath length %d is not a multiple of 4", len(b)))
+	}
+	path := make([]uint32, len(b)/4)
+	for i := range path {
+		path[i] = binary.BigEndian.Uint32(b[i*4:])
+	}
+	return path
+}
+
 // --- Bridge plumbing --------------------------------------------------------------------
 
 //export BBRegister
@@ -228,9 +241,9 @@ func BBGetMasterFingerprint(callID C.int64_t) {
 //export BBBTCXPub
 func BBBTCXPub(callID C.int64_t, coinType C.int32_t, keypath *C.uint8_t, keypathLen C.int32_t, addressType C.int32_t, display C.bool) {
 	// Copy inputs before returning: Dart frees them as soon as this call returns.
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	runAsync(callID, func() ([]byte, error) {
-		return []byte(api.BTCXPub(int(coinType), path, int(addressType), bool(display))), nil
+		return []byte(api.BTCXPub(int(coinType), keypathOf(path), int(addressType), bool(display))), nil
 	})
 }
 
@@ -266,18 +279,18 @@ func BBSupportsERC20(callID C.int64_t, contractAddress *C.char) {
 
 //export BBBTCSignMessage
 func BBBTCSignMessage(callID C.int64_t, coinType C.int32_t, keypath *C.uint8_t, keypathLen C.int32_t, msg *C.uint8_t, msgLen C.int32_t) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	m := goBytes(msg, msgLen)
 	runAsync(callID, func() ([]byte, error) {
-		return api.BTCSignMessage(int(coinType), path, m), nil
+		return api.BTCSignMessage(int(coinType), keypathOf(path), m), nil
 	})
 }
 
 //export BBETHGetAddress
 func BBETHGetAddress(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, outputType C.int32_t, display C.bool) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	runAsync(callID, func() ([]byte, error) {
-		return []byte(api.ETHGetAddress(int(chainID), path, int(outputType), bool(display), []byte{})), nil
+		return []byte(api.ETHGetAddress(int(chainID), keypathOf(path), int(outputType), bool(display), []byte{})), nil
 	})
 }
 
@@ -285,11 +298,11 @@ func BBETHGetAddress(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, ke
 //
 //export BBETHSignTransaction
 func BBETHSignTransaction(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, nonce C.int64_t, gasPrice *C.char, gasLimit C.int64_t, recipient *C.uint8_t, recipientLen C.int32_t, value *C.char, data *C.uint8_t, dataLen C.int32_t, recipientAddressCase C.int32_t) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	gp, v := C.GoString(gasPrice), C.GoString(value)
 	to, d := goBytes(recipient, recipientLen), goBytes(data, dataLen)
 	runAsync(callID, func() ([]byte, error) {
-		return api.ETHSignTransaction(int(chainID), path, int(nonce), gp, int(gasLimit), to, v, d, int(recipientAddressCase)), nil
+		return api.ETHSignTransaction(int(chainID), keypathOf(path), int(nonce), gp, int(gasLimit), to, v, d, int(recipientAddressCase)), nil
 	})
 }
 
@@ -297,11 +310,11 @@ func BBETHSignTransaction(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_
 //
 //export BBETHSignEIP1559
 func BBETHSignEIP1559(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, nonce C.int64_t, maxPriorityFeePerGas *C.char, maxFeePerGas *C.char, gasLimit C.int64_t, recipient *C.uint8_t, recipientLen C.int32_t, value *C.char, data *C.uint8_t, dataLen C.int32_t, recipientAddressCase C.int32_t) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	prio, fee, v := C.GoString(maxPriorityFeePerGas), C.GoString(maxFeePerGas), C.GoString(value)
 	to, d := goBytes(recipient, recipientLen), goBytes(data, dataLen)
 	runAsync(callID, func() ([]byte, error) {
-		return api.ETHSignEIP1559(int(chainID), path, int(nonce), prio, fee, int(gasLimit), to, v, d, int(recipientAddressCase)), nil
+		return api.ETHSignEIP1559(int(chainID), keypathOf(path), int(nonce), prio, fee, int(gasLimit), to, v, d, int(recipientAddressCase)), nil
 	})
 }
 
@@ -309,28 +322,28 @@ func BBETHSignEIP1559(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, k
 //
 //export BBETHSignRLPTx
 func BBETHSignRLPTx(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, encodedTx *C.char, isEIP1559 C.bool) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	tx := C.GoString(encodedTx)
 	runAsync(callID, func() ([]byte, error) {
-		return api.ETHSignRPLTx(int(chainID), path, tx, bool(isEIP1559)), nil
+		return api.ETHSignRPLTx(int(chainID), keypathOf(path), tx, bool(isEIP1559)), nil
 	})
 }
 
 //export BBETHSignMessage
 func BBETHSignMessage(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, msg *C.uint8_t, msgLen C.int32_t) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	m := goBytes(msg, msgLen)
 	runAsync(callID, func() ([]byte, error) {
-		return api.ETHSignMessage(int(chainID), path, m), nil
+		return api.ETHSignMessage(int(chainID), keypathOf(path), m), nil
 	})
 }
 
 //export BBETHSignTypedMessage
 func BBETHSignTypedMessage(callID C.int64_t, chainID C.int64_t, keypath *C.uint8_t, keypathLen C.int32_t, jsonMsg *C.uint8_t, jsonMsgLen C.int32_t) {
-	path := hex.EncodeToString(goBytes(keypath, keypathLen))
+	path := goBytes(keypath, keypathLen)
 	m := goBytes(jsonMsg, jsonMsgLen)
 	runAsync(callID, func() ([]byte, error) {
-		return api.ETHSignTypedMessage(int(chainID), path, m), nil
+		return api.ETHSignTypedMessage(int(chainID), keypathOf(path), m), nil
 	})
 }
 

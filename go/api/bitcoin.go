@@ -8,10 +8,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil/psbt"
 )
 
-func BTCXPub(coinType int, keypath string, addressType int, display bool) string {
-	keypathData, _ := hexToUint32Slice(keypath)
-
-	pub, _ := bitbox.BTCXPub(messages.BTCCoin(coinType), keypathData, messages.BTCPubRequest_XPubType(addressType), display)
+func BTCXPub(coinType int, keypath []uint32, addressType int, display bool) string {
+	pub, _ := bitbox.BTCXPub(messages.BTCCoin(coinType), keypath, messages.BTCPubRequest_XPubType(addressType), display)
 	return pub
 }
 
@@ -36,15 +34,10 @@ func BTCSignPSBT(coinType int, psbtStr string) string {
 	return psbtStr_
 }
 
-func BTCSignMessage(coinType int, keypath string, msg []byte) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
+func BTCSignMessage(coinType int, keypath []uint32, msg []byte) []byte {
 	scriptConfig := &messages.BTCScriptConfigWithKeypath{
 		ScriptConfig: firmware.NewBTCScriptConfigSimple(messages.BTCScriptConfig_P2WPKH),
-		Keypath:      keypathData,
+		Keypath:      keypath,
 	}
 
 	signature, err := bitbox.BTCSignMessage(messages.BTCCoin(coinType), scriptConfig, msg)

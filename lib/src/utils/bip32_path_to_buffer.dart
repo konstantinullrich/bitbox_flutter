@@ -1,15 +1,9 @@
 import 'dart:typed_data';
 
-import 'buffer.dart';
-
 Uint8List packDerivationPath(List<int> path) {
-  final inputWriter = ByteDataWriter();
-
-  // inputWriter.writeUint8(path.length); // Write length of the derivation path
-
-  for (final element in path) {
-    inputWriter.writeUint32(element); // Add each part of the path
+  final data = ByteData(path.length * 4);
+  for (var i = 0; i < path.length; i++) {
+    data.setUint32(i * 4, path[i]);
   }
-
-  return inputWriter.toBytes();
+  return data.buffer.asUint8List();
 }

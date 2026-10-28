@@ -11,7 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.1.8
-  convert: ^3.1.2
   ffi: ^2.1.4
   universal_ble: ^1.2.0
   hooks: ^2.0.2

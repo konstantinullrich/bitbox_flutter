@@ -1,9 +1,6 @@
 package api
 
 import (
-	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"io"
 	"os/exec"
 	"runtime"
@@ -108,22 +105,4 @@ func SupportsLTC() bool {
 
 func SupportsERC20(contractAddress string) bool {
 	return bitbox.SupportsERC20(contractAddress)
-}
-
-func hexToUint32Slice(hexStr string) ([]uint32, error) {
-	bytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding the hex string: %v", err)
-	}
-
-	if len(bytes)%4 != 0 {
-		return nil, fmt.Errorf("bytelength has to be divisable by 4 for uint32")
-	}
-
-	result := make([]uint32, len(bytes)/4)
-	for i := 0; i < len(bytes); i += 4 {
-		result[i/4] = binary.BigEndian.Uint32(bytes[i : i+4])
-	}
-
-	return result, nil
 }
