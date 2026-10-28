@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-enum BitboxConnectionStatus { disconnected, connecting, pairing, connected }
+enum BitboxConnectionStatus { disconnected, connecting, connected }
 
 abstract class BitboxTransport {
   BitboxConnectionStatus get connectionState => _connectionState;

@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/btcutil/psbt"
 )
 
-//export BTCXPub
 func BTCXPub(coinType int, keypath string, addressType int, display bool) string {
 	keypathData, _ := hexToUint32Slice(keypath)
 
@@ -16,7 +15,6 @@ func BTCXPub(coinType int, keypath string, addressType int, display bool) string
 	return pub
 }
 
-//export BTCSignPSBT
 func BTCSignPSBT(coinType int, psbtStr string) string {
 	psbt_, err := psbt.NewFromRawBytes(strings.NewReader(psbtStr), true)
 
@@ -38,7 +36,6 @@ func BTCSignPSBT(coinType int, psbtStr string) string {
 	return psbtStr_
 }
 
-//export BTCSignMessage
 func BTCSignMessage(coinType int, keypath string, msg []byte) []byte {
 	keypathData, err := hexToUint32Slice(keypath)
 	if err != nil {
@@ -57,7 +54,6 @@ func BTCSignMessage(coinType int, keypath string, msg []byte) []byte {
 	return signature.Signature
 }
 
-//export GetMasterFingerprint
 func GetMasterFingerprint() []byte {
 	fingerprint, err := bitbox.RootFingerprint()
 

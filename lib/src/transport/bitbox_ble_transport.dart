@@ -16,7 +16,6 @@ class BitboxBleTransport extends BitboxTransport {
   static const serviceUuid = 'e1511a45-f3db-44c0-82b8-6c880790d1f1';
   static const writerUuid = '799d485c-d354-4ed0-b577-f8ee79ec275a';
   static const readerUuid = '419572a5-9f53-4eb1-8db7-61bcab928867';
-  static const productUuid = '9d1c9a77-8b03-4e49-8053-3955cda7da93';
 
   static const _packetSize = 64;
 
@@ -128,10 +127,6 @@ class BitboxBleTransport extends BitboxTransport {
       );
     }
   }
-
-  /// Reads the product JSON (e.g. `{"p":"bb02p-multi","v":"9.23.0"}`).
-  Future<Uint8List> readProduct() =>
-      UniversalBle.read(_requireDeviceId(), serviceUuid, productUuid);
 
   @override
   Future<Uint8List> read(int length) async {

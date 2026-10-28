@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  xmlns:tools="http://schemas.android.com/tools"
-  package="com.cakewallet.bitbox_flutter">
+  xmlns:tools="http://schemas.android.com/tools">
   <!-- BitboxBleConnectionManager: scanning for and talking to a BitBox02 Nova. -->
   <uses-permission
     android:name="android.permission.BLUETOOTH_SCAN"

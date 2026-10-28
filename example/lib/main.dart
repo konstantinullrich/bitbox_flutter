@@ -25,7 +25,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final _manager = BitboxUsbConnectionManager();
+  final _manager = BitboxBleConnectionManager();
   StreamSubscription<BitboxDevice>? _scanSubscription;
   StreamSubscription<BitboxConnectionStatus>? _statusSubscription;
 
@@ -143,10 +143,9 @@ class _MyAppState extends State<MyApp> {
     theme: _theme,
     home: Scaffold(
       appBar: AppBar(
-        leading: const Text('BitBox'),
+        leading: _connection != null ? BitboxConnectionIndicator(connection: _connection!) : null,
+        title: const Text('BitBox'),
         actions: [
-          if (_connection case final connection?)
-            BitboxConnectionIndicator(connection: connection),
           IconButton(onPressed: _startScan, icon: const Icon(Icons.refresh), tooltip: 'Scan again'),
         ],
       ),

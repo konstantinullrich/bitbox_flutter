@@ -4,8 +4,6 @@ import 'package:bitbox_flutter/src/transport/bitbox_transport.dart';
 
 import 'bitbox_ffi.dart';
 
-/// Talks to the Go library over dart:ffi. Device listing and USB permission use the
-/// `bitbox_usb` method channel; device I/O goes through [MethodChannelBitboxTransport].
 class BitboxConnection {
   BitboxConnection(this.ffi, this._transport);
 
@@ -15,7 +13,6 @@ class BitboxConnection {
 
   BitboxConnectionStatus get status => _transport.connectionState;
 
-  /// Emits every change of [status].
   Stream<BitboxConnectionStatus> get statusChanges => _transport.connectionStateChanges;
 
   Future<void> disconnect() {
@@ -23,8 +20,8 @@ class BitboxConnection {
     return ffi.close();
   }
 
-  /// Pairs with the device. Listen to [events] first to show the pairing code; this
-  /// completes once the user accepted it on the device.
+  /// Pairs with the device. Listen to `BitboxConnectionManager.events` first to show the
+  /// pairing code; this completes once the user accepted it on the device.
   Future<void> initBitBox() async {
     final status = await ffi.initDevice();
     if (status == 'pairingFailed') {
@@ -57,6 +54,6 @@ class BitboxConnection {
   }
 
   void _checkDisposed() {
-    if (_disposed) throw StateError('BitboxFfiManager is disposed');
+    if (_disposed) throw StateError('BitboxConnection is disposed');
   }
 }

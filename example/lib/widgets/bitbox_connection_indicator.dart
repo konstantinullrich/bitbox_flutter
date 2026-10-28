@@ -13,16 +13,11 @@ class BitboxConnectionIndicator extends StatelessWidget {
     builder: (context, snapshot) {
       final (color, label) = switch (snapshot.data!) {
         BitboxConnectionStatus.connected => (Colors.green, 'Connected'),
-        BitboxConnectionStatus.pairing => (Colors.amber, 'Pairing'),
         BitboxConnectionStatus.connecting => (Colors.blue, 'Connecting'),
         BitboxConnectionStatus.disconnected => (Colors.red, 'Disconnected'),
       };
 
-      return Chip(
-        avatar: Icon(Icons.circle, size: 12, color: color),
-        label: Text(label),
-        visualDensity: VisualDensity.compact,
-      );
+      return Icon(Icons.circle, size: 12, color: color);
     },
   );
 }

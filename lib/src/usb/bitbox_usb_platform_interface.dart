@@ -1,21 +1,18 @@
 import 'package:bitbox_flutter/src/bitbox_device.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'bitbox_usb_method_channel.dart'
-    if (dart.library.html) 'web_ledger_usb.dart'
-    if (dart.library.js) 'web_ledger_usb.dart'
-    if (dart.library.js_interop) 'web_ledger_usb.dart';
+import 'bitbox_usb_method_channel.dart';
 
 abstract class BitboxUsbPlatform extends PlatformInterface {
   BitboxUsbPlatform() : super(token: _token);
 
   static final Object _token = Object();
 
-  static BitboxUsbPlatform _instance = createPlatformInstance();
+  static BitboxUsbPlatform _instance = MethodChannelBitboxUsb();
 
   /// The default instance of [BitboxUsbPlatform] to use.
   ///
-  /// Defaults to [MethodChannelBitboxUsb] or [WebLedgerUsb] if running on web.
+  /// Defaults to [MethodChannelBitboxUsb].
   static BitboxUsbPlatform get instance => _instance;
 
   /// Platform-specific implementations should set this with their own

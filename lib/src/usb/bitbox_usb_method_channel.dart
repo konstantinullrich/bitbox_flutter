@@ -4,8 +4,6 @@ import 'package:flutter/services.dart';
 
 import 'bitbox_usb_platform_interface.dart';
 
-BitboxUsbPlatform createPlatformInstance() => MethodChannelBitboxUsb();
-
 /// An implementation of [BitboxUsbPlatform] that uses method channels.
 class MethodChannelBitboxUsb extends BitboxUsbPlatform {
   /// The method channel used to interact with the native platform.

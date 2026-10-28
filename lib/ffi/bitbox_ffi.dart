@@ -119,9 +119,6 @@ class BitboxFfi {
   Future<void> channelHashVerify(bool ok) =>
       call((id, _) => lib.BBChannelHashVerify(id, ok));
 
-  Future<Uint8List> getMasterFingerprint() =>
-      call((id, _) => lib.BBGetMasterFingerprint(id));
-
   Future<bool> supportsETH(int chainId) =>
       call((id, _) => lib.BBSupportsETH(id, chainId)).then(_toBool);
 

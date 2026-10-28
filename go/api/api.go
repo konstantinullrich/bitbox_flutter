@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	_ "log"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -71,7 +70,6 @@ func (r readWriteCloser) Read(readBytesOut []byte) (int, error) {
 
 var bitbox *firmware.Device
 
-//export GetDevice
 func GetDevice(device GoReadWriteCloserInterface) {
 	const bitboxCMD = 0x80 + 0x40 + 0x01
 	comm := u2fhid.NewCommunication(readWriteCloser{device}, bitboxCMD)
@@ -84,18 +82,15 @@ func Device() *firmware.Device {
 	return bitbox
 }
 
-//export GetChannelHash
 func GetChannelHash() string {
 	hash, _ := bitbox.ChannelHash()
 	return hash
 }
 
-//export ChannelHashVerify
 func ChannelHashVerify(ok bool) {
 	bitbox.ChannelHashVerify(ok)
 }
 
-//export InitDevice
 func InitDevice() {
 	err := bitbox.Init()
 	if err != nil {
@@ -103,30 +98,16 @@ func InitDevice() {
 	}
 }
 
-//export SupportsETH
 func SupportsETH(chainId int) bool {
 	return bitbox.SupportsETH(uint64(chainId))
 }
 
-//export SupportsLTC
 func SupportsLTC() bool {
 	return bitbox.SupportsLTC()
 }
 
-//export SupportsBluetooth
-func SupportsBluetooth() bool {
-	return bitbox.SupportsBluetooth()
-}
-
-//export SupportsERC20
 func SupportsERC20(contractAddress string) bool {
 	return bitbox.SupportsERC20(contractAddress)
-}
-
-//export DeviceInfo
-func DeviceInfo() firmware.DeviceInfo {
-	info, _ := bitbox.DeviceInfo()
-	return *info
 }
 
 func hexToUint32Slice(hexStr string) ([]uint32, error) {
