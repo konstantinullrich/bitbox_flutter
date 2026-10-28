@@ -1,6 +1,6 @@
 name: bitbox_flutter
 description: "A flutter plugin for bitbox"
-version: 0.0.1
+version: 0.1.0
 homepage:
 
 environment:

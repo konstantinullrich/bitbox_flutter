@@ -143,7 +143,7 @@ class _MyAppState extends State<MyApp> {
     theme: _theme,
     home: Scaffold(
       appBar: AppBar(
-        title: const Text('BitBox'),
+        leading: const Text('BitBox'),
         actions: [
           if (_connection case final connection?)
             BitboxConnectionIndicator(connection: connection),
