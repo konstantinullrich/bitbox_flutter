@@ -1,3 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  package="com.cakewallet.bitbox_flutter">
+  xmlns:tools="http://schemas.android.com/tools">
+  <!-- BitboxBleConnectionManager: scanning for and talking to a BitBox02 Nova. -->
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation"
+    tools:targetApi="s" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+  <!-- Before Android 12, BLE scanning requires location access. -->
+  <uses-permission
+    android:name="android.permission.ACCESS_FINE_LOCATION"
+    android:maxSdkVersion="30" />
 </manifest>

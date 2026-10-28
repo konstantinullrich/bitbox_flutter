@@ -10,14 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-//export ETHGetAddress
-func ETHGetAddress(chainId int, keypath string, outputType int, display bool, contractAddress []byte) string {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
-	pub, err := bitbox.ETHPub(uint64(chainId), keypathData, messages.ETHPubRequest_OutputType(outputType), display, contractAddress)
+func ETHGetAddress(chainId int, keypath []uint32, outputType int, display bool, contractAddress []byte) string {
+	pub, err := bitbox.ETHPub(uint64(chainId), keypath, messages.ETHPubRequest_OutputType(outputType), display, contractAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -51,16 +45,11 @@ type legacyTxPayload struct {
 	V, R, S  *big.Int `rlp:"optional"`
 }
 
-//export ETHSignRPLTx
-func ETHSignRPLTx(chainId int, keypath string, encodedTx string, isEIP1559 bool) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
+func ETHSignRPLTx(chainId int, keypath []uint32, encodedTx string, isEIP1559 bool) []byte {
 	txEncoded, _ := hex.DecodeString(encodedTx)
 
 	var signature []byte
+	var err error
 	if isEIP1559 {
 		var tx dynamicFeeTxPayload
 		err = rlp.DecodeBytes(txEncoded, &tx)
@@ -70,7 +59,7 @@ func ETHSignRPLTx(chainId int, keypath string, encodedTx string, isEIP1559 bool)
 
 		signature, err = bitbox.ETHSignEIP1559(
 			uint64(chainId),
-			keypathData,
+			keypath,
 			tx.Nonce,
 			tx.GasTipCap,
 			tx.GasFeeCap,
@@ -88,7 +77,7 @@ func ETHSignRPLTx(chainId int, keypath string, encodedTx string, isEIP1559 bool)
 		}
 		signature, err = bitbox.ETHSign(
 			uint64(chainId),
-			keypathData,
+			keypath,
 			tx.Nonce,
 			tx.GasPrice,
 			tx.Gas,
@@ -106,33 +95,21 @@ func ETHSignRPLTx(chainId int, keypath string, encodedTx string, isEIP1559 bool)
 	return signature
 }
 
-//export ETHSignTransaction
-func ETHSignTransaction(chainId int, keypath string, nonce int, gasPrice string, gasLimit int, recipient []byte, value string, data []byte, recipientAddressCase int) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
+func ETHSignTransaction(chainId int, keypath []uint32, nonce int, gasPrice string, gasLimit int, recipient []byte, value string, data []byte, recipientAddressCase int) []byte {
 	gasPriceBI := new(big.Int)
 	gasPriceBI, _ = gasPriceBI.SetString(gasPrice, 16)
 
 	valueBI := new(big.Int)
 	valueBI, _ = valueBI.SetString(value, 16)
 
-	signature, err := bitbox.ETHSign(uint64(chainId), keypathData, uint64(nonce), gasPriceBI, uint64(gasLimit), [20]byte(recipient), valueBI, data, messages.ETHAddressCase(recipientAddressCase))
+	signature, err := bitbox.ETHSign(uint64(chainId), keypath, uint64(nonce), gasPriceBI, uint64(gasLimit), [20]byte(recipient), valueBI, data, messages.ETHAddressCase(recipientAddressCase))
 	if err != nil {
 		panic(err)
 	}
 	return signature
 }
 
-//export ETHSignEIP1559
-func ETHSignEIP1559(chainId int, keypath string, nonce int, maxPriorityFeePerGas string, maxFeePerGas string, gasLimit int, recipient []byte, value string, data []byte, recipientAddressCase int) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
+func ETHSignEIP1559(chainId int, keypath []uint32, nonce int, maxPriorityFeePerGas string, maxFeePerGas string, gasLimit int, recipient []byte, value string, data []byte, recipientAddressCase int) []byte {
 	maxPriorityFeePerGasBI := new(big.Int)
 	maxPriorityFeePerGasBI, _ = maxPriorityFeePerGasBI.SetString(maxPriorityFeePerGas, 16)
 
@@ -142,7 +119,7 @@ func ETHSignEIP1559(chainId int, keypath string, nonce int, maxPriorityFeePerGas
 	valueBI := new(big.Int)
 	valueBI, _ = valueBI.SetString(value, 16)
 
-	signature, err := bitbox.ETHSignEIP1559(uint64(chainId), keypathData, uint64(nonce), maxPriorityFeePerGasBI, maxFeePerGasBI, uint64(gasLimit), [20]byte(recipient), valueBI, data, messages.ETHAddressCase(recipientAddressCase))
+	signature, err := bitbox.ETHSignEIP1559(uint64(chainId), keypath, uint64(nonce), maxPriorityFeePerGasBI, maxFeePerGasBI, uint64(gasLimit), [20]byte(recipient), valueBI, data, messages.ETHAddressCase(recipientAddressCase))
 	if err != nil {
 		panic(err)
 	}
@@ -150,28 +127,16 @@ func ETHSignEIP1559(chainId int, keypath string, nonce int, maxPriorityFeePerGas
 	return signature
 }
 
-//export ETHSignMessage
-func ETHSignMessage(chainId int, keypath string, msg []byte) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
-	signature, err := bitbox.ETHSignMessage(uint64(chainId), keypathData, msg)
+func ETHSignMessage(chainId int, keypath []uint32, msg []byte) []byte {
+	signature, err := bitbox.ETHSignMessage(uint64(chainId), keypath, msg)
 	if err != nil {
 		panic(err)
 	}
 	return signature
 }
 
-//export ETHSignTypedMessage
-func ETHSignTypedMessage(chainId int, keypath string, jsonMsg []byte) []byte {
-	keypathData, err := hexToUint32Slice(keypath)
-	if err != nil {
-		panic(err)
-	}
-
-	signature, err := bitbox.ETHSignTypedMessage(uint64(chainId), keypathData, jsonMsg)
+func ETHSignTypedMessage(chainId int, keypath []uint32, jsonMsg []byte) []byte {
+	signature, err := bitbox.ETHSignTypedMessage(uint64(chainId), keypath, jsonMsg)
 	if err != nil {
 		panic(err)
 	}

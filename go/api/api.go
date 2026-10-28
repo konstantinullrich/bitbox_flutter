@@ -1,11 +1,7 @@
 package api
 
 import (
-	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"io"
-	_ "log"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -43,26 +39,12 @@ func init() {
 	fixTimezone()
 }
 
-// GoReadWriteCloserInterface adapts io.ReadWriteCloser's Read method to return the byte read byte slice
-// instead of the .Read([]byte) pattern. This is as gomobile bind seems to make a copy of passed
-// slices instead of writing directly to it, so the byte slice never makes it back to Go-land.
+// GoReadWriteCloserInterface adapts io.ReadWriteCloser's Read method to return the read bytes
+// instead of filling a caller-provided slice, which suits transports that live outside Go.
 type GoReadWriteCloserInterface interface {
 	Read(n int) ([]byte, error)
 	io.Writer
 	io.Closer
-}
-
-// GoDeviceInfoInterface adapts usb.DeviceInfo's Open method to return the adapted ReadWriteCloser.
-type GoDeviceInfoInterface interface {
-	IsBluetooth() bool
-	VendorID() int
-	ProductID() int
-	UsagePage() int
-	Interface() int
-	Serial() string
-	Product() string
-	Identifier() string
-	Open() (GoReadWriteCloserInterface, error)
 }
 
 // readWriteCloser implements io.ReadWriteCloser, translating from GoReadWriteCloserInterface. All methods
@@ -83,42 +65,29 @@ func (r readWriteCloser) Read(readBytesOut []byte) (int, error) {
 	return len(readBytes), nil
 }
 
-// deviceInfo implements usb.DeviceInfo, translating from GoDeviceInfoInterface. All methods are as-is except
-// for the Open method.
-type deviceInfo struct {
-	GoDeviceInfoInterface
-}
-
-// Open implements usb.DeviceInfo.
-func (d deviceInfo) Open() (io.ReadWriteCloser, error) {
-	device, err := d.GoDeviceInfoInterface.Open()
-	if err != nil {
-		return nil, err
-	}
-	return readWriteCloser{device}, nil
-}
-
 var bitbox *firmware.Device
 
-//export GetDevice
 func GetDevice(device GoReadWriteCloserInterface) {
 	const bitboxCMD = 0x80 + 0x40 + 0x01
 	comm := u2fhid.NewCommunication(readWriteCloser{device}, bitboxCMD)
 	bitbox = firmware.NewDevice(nil, nil, &mocks.Config{}, comm, &mocks.Logger{})
 }
 
-//export GetChannelHash
+// Device returns the device created by GetDevice, for callers that need the full firmware
+// API (e.g. events).
+func Device() *firmware.Device {
+	return bitbox
+}
+
 func GetChannelHash() string {
 	hash, _ := bitbox.ChannelHash()
 	return hash
 }
 
-//export ChannelHashVerify
 func ChannelHashVerify(ok bool) {
 	bitbox.ChannelHashVerify(ok)
 }
 
-//export InitDevice
 func InitDevice() {
 	err := bitbox.Init()
 	if err != nil {
@@ -126,46 +95,14 @@ func InitDevice() {
 	}
 }
 
-//export SupportsETH
 func SupportsETH(chainId int) bool {
 	return bitbox.SupportsETH(uint64(chainId))
 }
 
-//export SupportsLTC
 func SupportsLTC() bool {
 	return bitbox.SupportsLTC()
 }
 
-//export SupportsBluetooth
-func SupportsBluetooth() bool {
-	return bitbox.SupportsBluetooth()
-}
-
-//export SupportsERC20
 func SupportsERC20(contractAddress string) bool {
 	return bitbox.SupportsERC20(contractAddress)
-}
-
-//export DeviceInfo
-func DeviceInfo() firmware.DeviceInfo {
-	info, _ := bitbox.DeviceInfo()
-	return *info
-}
-
-func hexToUint32Slice(hexStr string) ([]uint32, error) {
-	bytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding the hex string: %v", err)
-	}
-
-	if len(bytes)%4 != 0 {
-		return nil, fmt.Errorf("bytelength has to be divisable by 4 for uint32")
-	}
-
-	result := make([]uint32, len(bytes)/4)
-	for i := 0; i < len(bytes); i += 4 {
-		result[i/4] = binary.BigEndian.Uint32(bytes[i : i+4])
-	}
-
-	return result, nil
 }
