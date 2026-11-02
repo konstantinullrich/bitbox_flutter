@@ -8,12 +8,11 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
-import com.cakewallet.bitbox_flutter.BitboxManager
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-class RequestPermissionOperation(manager: BitboxManager) :
-    UsbMethodCallOperation(manager.usbManager) {
+class RequestPermissionOperation(usbManager: UsbManager) :
+    UsbMethodCallOperation(usbManager) {
     public override fun onMethodCall(
         context: Context, methodCall: MethodCall, result: MethodChannel.Result
     ) {

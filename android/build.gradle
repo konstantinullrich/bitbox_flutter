@@ -22,15 +22,6 @@ allprojects {
     }
 }
 
-rootProject.allprojects {
-    repositories {
-        flatDir {
-//            dirs file('libs')
-            dirs project(':bitbox_flutter').file('libs')
-        }
-    }
-}
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
@@ -50,29 +41,9 @@ android {
 
     sourceSets {
         main.java.srcDirs += "src/main/kotlin"
-        test.java.srcDirs += "src/test/kotlin"
     }
 
     defaultConfig {
         minSdk = 21
-    }
-
-    dependencies {
-        implementation (name: 'api', ext: 'aar')
-
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
-    }
-
-    testOptions {
-        unitTests.all {
-            useJUnitPlatform()
-
-            testLogging {
-               events "passed", "skipped", "failed", "standardOut", "standardError"
-               outputs.upToDateWhen {false}
-               showStandardStreams = true
-            }
-        }
     }
 }

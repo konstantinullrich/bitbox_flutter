@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   bitbox_flutter
+  universal_ble
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

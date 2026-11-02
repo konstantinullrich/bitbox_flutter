@@ -1,8 +1,0 @@
-# yaml-language-server: $schema=../../ffigen.schema.json
-
-name: BitBoxFlutter
-description: Bindings to `go/bitbox.h`.
-output: 'lib/generated_bindings.g.dart'
-headers:
-  entry-points:
-    - 'go/bitbox.h'

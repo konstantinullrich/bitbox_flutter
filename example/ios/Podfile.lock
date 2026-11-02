@@ -1,0 +1,35 @@
+PODS:
+  - bitbox_flutter (0.0.1):
+    - Flutter
+  - Flutter (1.0.0)
+  - integration_test (0.0.1):
+    - Flutter
+  - universal_ble (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - bitbox_flutter (from `.symlinks/plugins/bitbox_flutter/ios`)
+  - Flutter (from `Flutter`)
+  - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - universal_ble (from `.symlinks/plugins/universal_ble/darwin`)
+
+EXTERNAL SOURCES:
+  bitbox_flutter:
+    :path: ".symlinks/plugins/bitbox_flutter/ios"
+  Flutter:
+    :path: Flutter
+  integration_test:
+    :path: ".symlinks/plugins/integration_test/ios"
+  universal_ble:
+    :path: ".symlinks/plugins/universal_ble/darwin"
+
+SPEC CHECKSUMS:
+  bitbox_flutter: 9505732798041c413152669751beeaecc5fe400f
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
+  universal_ble: 45519b2aeafe62761e2c6309f8927edb5288b914
+
+PODFILE CHECKSUM: 3ad56d4ff1ca2f9b6a5db35c092dc7d62f59b388
+
+COCOAPODS: 1.16.2
